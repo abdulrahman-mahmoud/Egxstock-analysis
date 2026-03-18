@@ -192,7 +192,6 @@ pandas
 numpy
 matplotlib
 seaborn
-scikit-learn
 requests
 python-dotenv
 ```
