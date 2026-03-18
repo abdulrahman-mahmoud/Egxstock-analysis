@@ -1,10 +1,10 @@
-# 📊 EGX Stocks & Currency Data Acquisition
+# EGX Stocks & Currency Data Acquisition
 
 > A modular Python framework for acquiring, processing, and visualizing financial data from the **Egyptian Exchange (EGX)** — built for academic research and practical finance applications.
 
 ---
 
-## 🗂 Table of Contents
+## Table of Contents
 
 - [Overview](#overview)
 - [Features](#features)
@@ -29,25 +29,25 @@ It was developed as a two-phase academic project and is designed to be **scalabl
 
 ## Features
 
-### 🔌 Data Collection
-| Method | Purpose |
-|---|---|
-| `BeautifulSoup` | Static scraping of EGX stock prices, categories, and currency rates |
-| `Selenium` | Dynamic content — live filters, market recommendations, real-time rate updates |
-| `yfinance` | Historical OHLCV data for EGX-listed tickers |
-| `SerpApi` | Supplementary financial data and search-based queries |
-| REST APIs | Structured retrieval of exchange and currency data |
+### Data Collection
+| Method | Source | Purpose |
+|---|---|---|
+| `BeautifulSoup` | `mubasher.info` | Live stock prices, EGX indices, sector data, company fundamentals |
+| `Selenium` | `stockanalysis.com` | Full ticker list, per-stock financials, market cap data |
+| `Selenium` | `african-markets.com` | EGX30 index history, weekly summaries, listed companies |
+| `yfinance` | Yahoo Finance | Historical OHLCV data for EGX-listed tickers (`.CA` suffix) |
+| `SerpApi` | Google Finance | Fallback — stock price, movement, and news via search |
 
-### 🧹 Data Processing
+### Data Processing
 - **Cleaning & normalization** of raw scraped data (handling missing values, type casting, deduplication)
 - **Graph construction** via `NetworkX` — models co-traded stocks, sector relationships, and currency correlations
 
-### 📈 Visualization & Insights
+### Visualization & Insights
 - **Network graphs** — identify key stocks (high-degree nodes) and sector communities via community detection
 - **Heatmaps** — pricing trends across sectors, currency fluctuation over time
 - **3D Point Cloud** — clustering of stocks by price, volume, and performance metrics
 
-### 🖥 GUI Dashboard
+### GUI Dashboard
 - Built with `Tkinter`, organized across **7 tabs**
 - Covers: live data view, historical charts, network graph explorer, heatmap viewer, point cloud, sector breakdown, and settings
 - Threaded data fetching to keep the UI responsive
@@ -138,14 +138,15 @@ python visualization/point_cloud.py
 
 ## Data Sources
 
-| Source | Data |
-|---|---|
-| [EGX Official Site](https://www.egx.com.eg) | Stock prices, categories, indices |
-| [yfinance](https://pypi.org/project/yfinance/) | Historical OHLCV for EGX tickers |
-| [SerpApi](https://serpapi.com/) | Financial search queries |
-| Currency APIs | EGP exchange rates vs USD, EUR, GBP |
+| Source | Tool | Data |
+|---|---|---|
+| [Mubasher](https://english.mubasher.info/markets/EGX/) | `BeautifulSoup` | Live stock prices, EGX30 & EGX33 indices, sector breakdowns, company fundamentals |
+| [Stock Analysis](https://stockanalysis.com/list/egyptian-stock-exchange/) | `Selenium` | Full EGX ticker list, market cap, per-stock financials and historical data |
+| [African Markets](https://african-markets.com/en/stock-markets/egx) | `Selenium` | EGX30 performance, index history, weekly market summaries, listed companies |
+| [SerpApi](https://serpapi.com/) | API | Google Finance results for EGX stocks — price, movement, news (fallback) |
+| [yfinance](https://pypi.org/project/yfinance/) | API | Historical OHLCV for EGX-listed tickers (use `.CA` suffix e.g. `COMI.CA`) |
 
-> **Note:** Some sources require API keys. See `.env.example` for the required variables.
+> **Note:** SerpApi requires an API key. See `.env.example` for the required variables. All scraping targets are non-government, publicly accessible sources with no heavy bot protection.
 
 ---
 
