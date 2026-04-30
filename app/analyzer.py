@@ -167,7 +167,7 @@ class EgxAnalyzer:
             'Ann_Volatility', ascending=False
         ).to_dict('records')
     
-    def get_sector_growth_data(self ,invest): 
+    def get_sector_growth_data(self ,invest =10000): 
         sector_daily = self.df.groupby(
             ['Date', 'Sector']
         )['Daily_Return'].mean().reset_index()
