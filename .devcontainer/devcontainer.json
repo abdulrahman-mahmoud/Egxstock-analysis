@@ -14,7 +14,7 @@
       ]
     }
   },
-  "updateContentCommand":  "pip3 install --user -r .devcontainer/requirements.txt && pip3 install --user streamlit",
+  "updateContentCommand":  "pip3 install --user -r requirements.txt && pip3 install --user streamlit",
   "forwardPorts": [
     8501
   ],
