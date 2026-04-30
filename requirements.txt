@@ -1,8 +1,20 @@
-streamlit
+# Core Data Processing
 pandas
 numpy
+
+# Web Dashboard & Interactive UI
+streamlit
+plotly
+
+# Data Visualization & Graphs
 matplotlib
 networkx
-plotly
+
+# Web Scraping & APIs
+yfinance
 requests
 beautifulsoup4
+selenium
+
+# Development Support
+ipykernel
