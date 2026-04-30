@@ -18,9 +18,9 @@ class EgxVisualization:
         'Oil & Gas':         "#080808"
     }
 
-    def __init__(self ,data):
+    def __init__(self, data):
         self.data = data
-
+        
 
     def networkx_sector(self):
 
@@ -38,9 +38,6 @@ class EgxVisualization:
             for i in range(len(companies)):
                 for j in range(i + 1, len(companies)):
                     G_sector.add_edge(companies[i], companies[j])
-
-        print(f'Nodes: {G_sector.number_of_nodes()}')  # going to change it later
-        print(f'Edges: {G_sector.number_of_edges()}')  # going to change it later
 
         node_colors = [
             self.sector_colors.get(
@@ -93,53 +90,59 @@ class EgxVisualization:
         ax.axis('off')
 
         plt.tight_layout()
-        plt.show()
+        return fig
 
     def PlotSector_Growth(self):
+
         sector_data = self.data.get_sector_growth_data()
-         
+
         fig, ax = plt.subplots(figsize=(14, 6))
 
-        for sector,datas in sector_data.items():
+        for sector, datas in sector_data.items():
+
             df_sector = pd.DataFrame(datas)
+
             ax.plot(
                 pd.to_datetime(df_sector['Date']),
                 df_sector['Portfolio_Value'],
                 label=sector, linewidth=2
             )
 
-        ax.set_title(
-            'Growth of 10,000 EGP Investment by Sector', fontsize=14
-        )
+        ax.set_title('Growth of 10,000 EGP Investment by Sector', fontsize=14)
         ax.set_xlabel('Date')
         ax.set_ylabel('Portfolio Value (EGP)')
         ax.legend(loc='upper left', bbox_to_anchor=(1, 1))
         ax.grid(True, alpha=0.3)
-        plt.tight_layout()
 
+        plt.tight_layout()
         return fig
+
     def PlotVolatility(self):
-        vol_data = self.analyzer.get_volatility_data()
+
+        vol_data = self.data.get_volatility_data()
         dfVol = pd.DataFrame(vol_data)
 
         fig, ax = plt.subplots(figsize=(13, 6))
 
         ax.bar(range(len(dfVol)), dfVol['Ann_Volatility'])
         ax.set_xticks(range(len(dfVol)))
+
         ax.set_xticklabels(
-            dfVol['Company'], rotation=45, ha='right', fontsize=7
+            dfVol['Company'],
+            rotation=45,
+            ha='right',
+            fontsize=7
         )
-        ax.set_title('Annualised Volatility per Company', fontsize=14, fontweight='bold')
+
+        ax.set_title('Annualised Volatility per Company', fontsize=14)
         ax.set_xlabel('Company')
         ax.set_ylabel('Annualised Volatility (%)')
 
-        plt.xticks(rotation=45, ha='right', fontsize=7)
         plt.tight_layout()
-        plt.show()
+        return fig
 
-        return fig 
     def plot_rolling_volatility(self, company_name):
-        
+
         data = self.data.get_rolling_volatility_data(company_name)
 
         if not data:
@@ -148,18 +151,21 @@ class EgxVisualization:
         df_vol = pd.DataFrame(data)
 
         fig, ax = plt.subplots(figsize=(14, 5))
+
         ax.plot(
             pd.to_datetime(df_vol['date']),
-            df_vol['volatility'], linewidth=2
+            df_vol['volatility'],
+            linewidth=2
         )
+
         ax.set_title(
             f'30-Day Rolling Annualised Volatility — {company_name}',
-            fontsize=13, fontweight='bold'
+            fontsize=13
         )
-        ax.set_xlabel('Date')
-        ax.set_ylabel('Rolling Volatility (%)')
-        ax.grid(True, alpha=0.3)
-        plt.tight_layout()
 
+        ax.set_xlabel('Date')
+        ax.set_ylabel('Volatility (%)')
+        ax.grid(True, alpha=0.3)
+
+        plt.tight_layout()
         return fig
-    

@@ -1,148 +1,142 @@
-import customtkinter as ctk
-import matplotlib.pyplot as plt
-import networkx as nx
-import pandas as pd
-import numpy as np
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+
 import os
+import sys
+import plotly.express as px
+import streamlit as st
+
+APP_DIR = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR = os.path.dirname(APP_DIR)
+DATA_DIR = os.path.join(BASE_DIR, "data")
+
+if APP_DIR not in sys.path:
+    sys.path.insert(0, APP_DIR)
 
 from analyzer import EgxAnalyzer
 from scraper import EgxScraper
 from vizulliztion import EgxVisualization
 
+#------------------------------------------------------------------------
+#                              streamlit 
+#-------------------------------------------------------------------------
 
-app = ctk.CTk()
-app.geometry("1200x800")
-ctk.set_appearance_mode("dark")
+def loader():
+    analyzer = EgxAnalyzer(DATA_DIR)
 
+    if not analyzer.load_data():
+        return None,None,None,None
+    
+    analyzer.clean()
 
-data_engine = EgxAnalyzer(data='data')
+    analyzer.checker()
 
-viz_engine = None
+    viz = EgxVisualization(analyzer)
+    scraper = EgxScraper()
 
-if data_engine.load_data():
-    data_engine.clean()
-    viz_engine = EgxVisualization(data_engine)
-else:
-    print(data_engine.error_message)
-
-
-def clear_screen():
-    for widget in app.winfo_children():
-        widget.destroy()
+    return analyzer, viz, scraper
 
 
-def show_main_menu():
-    clear_screen()
+st.set_page_config(page_title="EGX Market", layout="wide")
+st.sidebar.title("EGX Market")
+page = st.sidebar.radio(
+    "Navigate",
+    ["Overview", "Scraping", "Company analysis", "Network analysis", "Sector", "Volatility","Monthly Volatility"]
+)
 
-    label = ctk.CTkLabel(
-        master=app,
-        text="EGX Stocks",
-        width=300,
-        height=60,
-        font=("Arial", 24),
-        text_color="#FFCC70"
-    )
-    label.place(relx=0.5, rely=0.2, anchor="center")
+analyzer, viz, scraper = loader()
 
-    ctk.CTkButton(app, text="Scraping",
-                  command=show_scraping_page).place(relx=0.2, rely=0.5, anchor="center")
+if analyzer is None:
+    st.error("Could not load data. Please check if raw.csv and stock_data.csv exist in the data folder.")
+    st.stop()
 
-    ctk.CTkButton(app, text="Loading Data and Cleaning",
-                  command=show_Ldata_page).place(relx=0.5, rely=0.5, anchor="center")
-
-    ctk.CTkButton(app, text="Specific company for analysis",
-                  command=show_comp_page).place(relx=0.8, rely=0.5, anchor="center")
-
-    ctk.CTkButton(app, text="Network",
-                  command=show_network_page).place(relx=0.2, rely=0.7, anchor="center")
-
-    ctk.CTkButton(app, text="Plot Sector Growth",
-                  command=show_pltsector_page).place(relx=0.5, rely=0.7, anchor="center")
-
-    ctk.CTkButton(app, text="Volatility",
-                  command=show_vol_page).place(relx=0.8, rely=0.7, anchor="center")
+if page == "Overview":
+    st.title("EGX Market Overview")
+    st.info("This dashboard analyzes 32 Shariah-compliant companies on the EGX from June to December 2025. Using 4,640 records from Yahoo Finance and African Markets, it evaluates stock performance, risk (volatility), and sector-level trends to provide deep financial insights into the Egyptian market's behavior")
+    c1 , c2 , c3 = st.columns(3)
+    c1.metric("Total Companies", analyzer.df["Company"].nunique())
+    c2.metric("Total Data Points", len(analyzer.df))
+    c3.metric("Sectors Covered", len(analyzer.SECTORS))
+    st.subheader("Recent Market Data")
+    st.dataframe(analyzer.df.head(10), use_container_width=True)
 
 
-# -----------------------------------------------------------------
-# PAGES
-# -----------------------------------------------------------------
-def show_network_page():
-    clear_screen()
+elif page == "Scraping":
+    st.title("Scraper")
 
-    ctk.CTkLabel(app, text="NetworkX Analysis",
-                 font=("Arial", 24)).place(relx=0.5, rely=0.3, anchor="center")
+    start = st.date_input("Start")
+    end = st.date_input("End")
 
-    viz_engine.networkx_sector()
+    if st.button("Yahoo Api"):
 
-    ctk.CTkButton(app, text="Go Back",
-                  command=show_main_menu).place(relx=0.1, rely=0.95)
+        df = scraper.api(start.isocalendar(),end.isocalendar())
 
+        if not df.empty:
+            scraper.save_csv(df, os.path.join(DATA_DIR, "raw.csv"))
+            loader.clear()
+            st.success("Saved")
 
-def show_scraping_page():
-    clear_screen()
+    elif st.button("African Markets"):
 
-    ctk.CTkLabel(app, text="Scraping",
-                 font=("Arial", 24)).place(relx=0.5, rely=0.3, anchor="center")
+        df = scraper.african_markets_scraper()
 
-    ctk.CTkButton(app, text="Go Back",
-                  command=show_main_menu).place(relx=0.1, rely=0.95)
+        if not df.empty:
+            scraper.save_csv(df, os.path.join(DATA_DIR, "raw.csv"))
+            loader.clear()
+            st.success("Saved")
 
+elif page == "Company analysis":
 
-def show_Ldata_page():
-    clear_screen()
+    st.title("Company Analysis")
+    names = analyzer.company_names()
+    company = st.selectbox("company",names)
 
-    ctk.CTkLabel(app, text="Loading Data and Cleaning",
-                 font=("Arial", 24)).place(relx=0.5, rely=0.3, anchor="center")
+    data = analyzer.specific_company(company)
 
-    ctk.CTkButton(app, text="Go Back",
-                  command=show_main_menu).place(relx=0.1, rely=0.95)
+    if data is None:
+        st.error("No data")
+        st.stop()
+    
+    c1 ,c2 ,c3 ,c4 = st.columns(4)
+    c1.metric("Sector", data["sector"])
+    c2.metric("YTD", data["ytd"])
+    c3.metric("Close", f"{data['latest']['close']:.2f}")
+    c4.metric("Volatility", f"{data['risk']['annualized_volatility']:.2f}%")
 
+    df_plot = analyzer.df[analyzer.df["Company"] == company]
 
-def show_comp_page():
-    clear_screen()
+    fig = px.line(df_plot, x="Date", y="Close", title=f"{company} Price Trend")
 
-    ctk.CTkLabel(app, text="Specific company for analysis",
-                 font=("Arial", 24)).place(relx=0.5, rely=0.3, anchor="center")
+    st.plotly_chart(fig, use_container_width=True)
 
-    ctk.CTkButton(app, text="Go Back",
-                  command=show_main_menu).place(relx=0.1, rely=0.95)
-
-
-def show_pltsector_page():
-    clear_screen()
-
-    ctk.CTkLabel(app, text="Plot Sector Growth",
-                 font=("Arial", 24)).place(relx=0.5, rely=0.05, anchor="center")
-
-    fig = viz_engine.PlotSector_Growth()
-
-    canvas = FigureCanvasTkAgg(fig, master=app)
-    canvas.draw()
-    canvas.get_tk_widget().place(relx=0.5, rely=0.5, anchor="center")
-
-    ctk.CTkButton(app, text="Go Back",
-                  command=show_main_menu).place(relx=0.1, rely=0.95)
+elif page == "Network analysis":
+    
+    st.title("Market Network Analysis")
+    st.write("Graph visualizing company clusters grouped by their sectors.")
+    st.pyplot(viz.networkx_sector())
 
 
-def show_vol_page():
-    clear_screen()
+elif page == "Sector":
+    st.title("Sector Performance")
+    st.write("Visualizes the performance of a 10,000 EGP investment per sector.")
+    sector_plt = viz.PlotSector_Growth()
 
-    ctk.CTkLabel(app, text="Volatility",
-                 font=("Arial", 24)).place(relx=0.5, rely=0.3, anchor="center")
+    st.plotly_chart(sector_plt, use_container_width=True)
 
-    fig = viz_engine.PlotVolatility()
+elif page == "Volatility":
+    st.title("Volatility (Risk)")
 
-    canvas = FigureCanvasTkAgg(fig, master=app)
-    canvas.draw()
-    canvas.get_tk_widget().place(relx=0.5, rely=0.5, anchor="center")
+    vol = viz.PlotVolatility()
+    st.plotly_chart(vol,use_container_width=True)
 
-    ctk.CTkButton(app, text="Go Back",
-                  command=show_main_menu).place(relx=0.1, rely=0.95)
+elif page == "Monthly Volatility":
+    st.title("Monthly Volatility (Risk)")
+    names = analyzer.company_names()
+    company = st.selectbox("company",names)
 
+    data = analyzer.specific_company(company)
 
-# -----------------------------------------------------------------
-# RUN APP
-# -----------------------------------------------------------------
-show_main_menu()
-app.mainloop()
+    if data is None:
+        st.error("No data")
+        st.stop()
+
+    MonthVol = viz.plot_rolling_volatility(company)
+    st.plotly_chart(MonthVol,use_container_width=True)    
