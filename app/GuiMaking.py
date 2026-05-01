@@ -39,7 +39,7 @@ st.set_page_config(page_title="EGX Market", layout="wide")
 st.sidebar.title("EGX Market")
 page = st.sidebar.radio(
     "Navigate",
-    ["Overview", "Scraping", "Company analysis", "Network analysis", "Sector", "Volatility","Monthly Volatility"]
+    ["Overview", "Scraping", "Company analysis", "Network analysis", "Sector", "Volatility"]
 )
 
 analyzer, viz, scraper = loader()
@@ -107,6 +107,12 @@ elif page == "Company analysis":
 
     st.plotly_chart(fig, use_container_width=True)
 
+    st.title("Monthly Volatility (Risk)")
+
+    MonthVol = viz.plot_rolling_volatility(company)
+    st.plotly_chart(MonthVol,use_container_width=True)    
+
+
 elif page == "Network analysis":
     
     st.title("Market Network Analysis")
@@ -127,16 +133,3 @@ elif page == "Volatility":
     vol = viz.PlotVolatility()
     st.plotly_chart(vol,use_container_width=True)
 
-elif page == "Monthly Volatility":
-    st.title("Monthly Volatility (Risk)")
-    names = analyzer.company_names()
-    company = st.selectbox("company",names)
-
-    data = analyzer.specific_company(company)
-
-    if data is None:
-        st.error("No data")
-        st.stop()
-
-    MonthVol = viz.plot_rolling_volatility(company)
-    st.plotly_chart(MonthVol,use_container_width=True)    
