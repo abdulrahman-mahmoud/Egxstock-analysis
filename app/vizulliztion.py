@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import networkx as nx
+import seaborn as sns
 import pandas as pd
 import numpy as np
 
@@ -19,7 +20,7 @@ class EgxVisualization:
     }
 
     def __init__(self, data):
-        self.data = data
+        self.data = data    
         
 
     def networkx_sector(self):
@@ -169,3 +170,74 @@ class EgxVisualization:
 
         plt.tight_layout()
         return fig
+    
+    def heatmap(self, companies, monthly_perf):
+
+        recent_12_months = sorted(monthly_perf["Month"].unique())[-12:]
+
+        plot_df = monthly_perf[
+            (monthly_perf["Company"].isin(companies)) &
+            (monthly_perf["Month"].isin(recent_12_months))
+        ].pivot(
+            index="Company",
+            columns="Month",
+            values="Monthly_Return"
+        )
+
+        # 4. Create the Plot
+        fig ,ax  = plt.subplots(figsize=(14, 10))
+        sns.heatmap(plot_df.astype(float), annot=True, fmt=".2f", cmap='RdYlGn', center=0,
+                    linewidths=.5, cbar_kws={'label': 'Monthly Return %'})
+
+        ax.set_title("EGX Monthly Performance: Top Companies", fontsize=16)
+        ax.set_ylabel("Company")
+        ax.set_xlabel("Month")
+
+        plt.tight_layout()
+
+        return fig
+        
+
+    def plot_gainers(self, n=5):
+
+        monthly_perf = self.data.get_monthly()
+        x = self.data.top_n_per_month(monthly_perf, n)
+
+        latest = x[x["Month"] == x["Month"].max()]
+        data = latest[latest["Type"] == "Gainer"].sort_values(
+            "Monthly_Return",
+            ascending=False
+        )
+
+        fig, ax = plt.subplots(figsize=(7, 5))
+
+        ax.barh(data["Company"], data["Monthly_Return"], color="#2ecc71")
+        ax.set_title(f"Top {n} Gainers")
+        ax.axvline(0, color="black", linewidth=0.8)
+        ax.invert_yaxis()
+
+        plt.tight_layout()
+        return fig
+    
+    def plot_losers(self, n=5):
+
+        monthly_perf = self.data.get_monthly()
+        x = self.data.top_n_per_month(monthly_perf, n)
+
+        latest = x[x["Month"] == x["Month"].max()]
+        data = latest[latest["Type"] == "Loser"].sort_values(
+            "Monthly_Return",
+            ascending=True
+        )
+
+        fig, ax = plt.subplots(figsize=(7, 5))
+
+        ax.barh(data["Company"], data["Monthly_Return"], color="#e74c3c")
+        ax.set_title(f"Top {n} Losers")
+        ax.axvline(0, color="black", linewidth=0.8)
+        ax.invert_yaxis()
+
+        plt.tight_layout()
+        return fig
+
+        

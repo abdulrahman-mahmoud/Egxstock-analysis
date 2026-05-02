@@ -2,6 +2,7 @@
 import os
 import sys
 import plotly.express as px
+import pandas as pd
 import streamlit as st
 
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -23,7 +24,7 @@ def loader():
     analyzer = EgxAnalyzer(DATA_DIR)
 
     if not analyzer.load_data():
-        return None,None,None,None
+        return None,None,None
     
     analyzer.clean()
 
@@ -39,7 +40,7 @@ st.set_page_config(page_title="EGX Market", layout="wide")
 st.sidebar.title("EGX Market")
 page = st.sidebar.radio(
     "Navigate",
-    ["Overview", "Scraping", "Company analysis", "Network analysis", "Sector", "Volatility"]
+    ["Overview", "Scraping", "Company analysis", "Network analysis", "Gainers & Losers", "Sector"]
 )
 
 analyzer, viz, scraper = loader()
@@ -67,11 +68,11 @@ elif page == "Scraping":
 
     if st.button("Yahoo Api"):
 
-        df = scraper.api(start.isocalendar(),end.isocalendar())
+        df = scraper.api(start.isoformat(),end.isoformat())
 
         if not df.empty:
             scraper.save_csv(df, os.path.join(DATA_DIR, "raw.csv"))
-            loader.clear()
+            st.rerun()
             st.success("Saved")
 
     elif st.button("African Markets"):
@@ -80,7 +81,7 @@ elif page == "Scraping":
 
         if not df.empty:
             scraper.save_csv(df, os.path.join(DATA_DIR, "raw.csv"))
-            loader.clear()
+            st.rerun()
             st.success("Saved")
 
 elif page == "Company analysis":
@@ -110,7 +111,13 @@ elif page == "Company analysis":
     st.title("Monthly Volatility (Risk)")
 
     MonthVol = viz.plot_rolling_volatility(company)
+
     st.plotly_chart(MonthVol,use_container_width=True)    
+
+    st.title("Volatility (Risk)")
+
+    vol = viz.PlotVolatility()
+    st.pyplot(vol,use_container_width=True)
 
 
 elif page == "Network analysis":
@@ -127,9 +134,27 @@ elif page == "Sector":
 
     st.plotly_chart(sector_plt, use_container_width=True)
 
-elif page == "Volatility":
-    st.title("Volatility (Risk)")
 
-    vol = viz.PlotVolatility()
-    st.plotly_chart(vol,use_container_width=True)
+elif page == "Gainers & Losers":
+
+    st.title("Top Gainers & Losers")
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.pyplot(viz.plot_gainers(5))
+
+    with col2:
+        st.pyplot(viz.plot_losers(5))
+        
+    monthly_perf = analyzer.get_monthly()
+
+    top_companies = analyzer.df["Company"].value_counts().head(15).index.tolist()
+    fig = viz.heatmap(top_companies, monthly_perf)
+    
+    st.title("Heatmap - Monthly Returns")
+
+    st.pyplot(fig)
+    
+        
+
 

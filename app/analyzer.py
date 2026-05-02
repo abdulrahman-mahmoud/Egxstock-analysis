@@ -81,6 +81,7 @@ class EgxAnalyzer:
 
     def clean(self):
         try:
+            self.df = self.df.sort_values(["Company", "Date"])
             self.df.columns = self.df.columns.str.strip()
             self.df = self.df.drop(['Capital Gains', 'Dividends', 'Stock Splits'], axis=1, errors='ignore')
 
@@ -115,6 +116,12 @@ class EgxAnalyzer:
                 .set_index('Company')[['Sector', 'Price', 'YTD', 'M.Cap']]
                 .to_dict('index')
             )
+            self.df = (
+                    self.df
+                    .sort_values(['Company', 'Date', 'Volume'], ascending=[True, True, False])
+                    .drop_duplicates(['Company', 'Date'], keep='first')
+                    .reset_index(drop=True)
+                )
 
             for company, info in self.FALLBACK_METADATA.items():
                 if company not in self.company_info_map:
@@ -147,6 +154,7 @@ class EgxAnalyzer:
     
 
     def checker(self):
+        self.df = self.df.sort_values(["Company", "Date"])
         if self.df is None or self.df.empty:
             return
 
@@ -158,27 +166,28 @@ class EgxAnalyzer:
                 self.df[col] = pd.to_numeric(self.df[col], errors="coerce")
 
         # 2. MarketCap Fill
-
         if self.company_info_map is not None:
+
             cap_map = {
                 company: info.get("M.Cap")
                 for company, info in self.company_info_map.items()
             }
-            self.df["MarketCap"] = self.df["MarketCap"].fillna(self.df["Company"].map(cap_map))
 
-        
+            if "MarketCap" not in self.df.columns:
+                self.df["MarketCap"] = np.nan
+
+            self.df["MarketCap"] = self.df["MarketCap"].fillna(
+                self.df["Company"].map(cap_map)
+            )
+                
         self.df["Price_Range"] = (self.df["High"] - self.df["Low"]) / self.df["Close"]
         
         self.df["Total_Gain"] = (
             self.df.groupby("Company")["Close"]
             .transform(lambda x: (x - x.iloc[0]) / x.iloc[0] * 100)
         )
-
-        self.df["Portfolio_Value"] = (
-            10000 * (1 + self.df["Daily_Return"].fillna(0))
-            .groupby(self.df["Company"])
-            .cumprod()
-        )
+        
+        self.df["Portfolio_Value"] = self.df.groupby("Company")["Daily_Return"].transform(lambda r: 10000 * (1 + r.fillna(0)).cumprod())
 
 
 
@@ -314,4 +323,23 @@ class EgxAnalyzer:
         counts = self.df2['Company'].value_counts() if self.df2 is not None else pd.Series(dtype=int)
 
         return counts[counts > 1].index.tolist()
+    
+    def get_monthly(self):
+        self.df['Month'] = self.df['Date'].dt.to_period('M')
+        monthly_perf = self.df.sort_values(['Company', 'Date']).groupby(['Company', 'Month'])['Close'].agg(['first', 'last'])
+        monthly_perf['Monthly_Return'] = (monthly_perf['last'] / monthly_perf['first'] - 1) * 100
+
+        return monthly_perf.reset_index()
+
+    def top_n_per_month(self,monthly_perf, n=5):
+        results = []
+        for month in sorted(monthly_perf['Month'].unique()):
+            month_data = monthly_perf[monthly_perf['Month'] == month]
+            gainers = month_data.nlargest(n, 'Monthly_Return')[['Company', 'Monthly_Return']].assign(Type='Gainer', Month=month)
+            losers  = month_data.nsmallest(n, 'Monthly_Return')[['Company', 'Monthly_Return']].assign(Type='Loser',  Month=month)
+            results.extend([gainers, losers])
+        return pd.concat(results, ignore_index=True)
+
+
+
     
