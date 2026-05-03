@@ -268,6 +268,17 @@ class EgxAnalyzer:
 
         return risk.sort_values('Ann_Volatility', ascending=False).to_dict('records')
 
+    def get_ticker(self, company_name):
+        df = self.df.copy()
+
+        row = df[df["Company"] == company_name]
+
+        if row.empty:
+            return "N/A"
+
+        # safest unique ticker extraction
+        return row["Symbol"].dropna().iloc[0]
+
     def get_sector_growth_data(self):
 
         if self.df is None or 'Sector' not in self.df.columns:

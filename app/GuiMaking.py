@@ -1,9 +1,12 @@
-
 import os
 import sys
 import plotly.express as px
 import pandas as pd
 import streamlit as st
+
+# =========================================================
+# PATH SETUP
+# =========================================================
 
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 BASE_DIR = os.path.dirname(APP_DIR)
@@ -16,18 +19,36 @@ from analyzer import EgxAnalyzer
 from scraper import EgxScraper
 from vizulliztion import EgxVisualization
 
-#------------------------------------------------------------------------
-#                              streamlit 
-#-------------------------------------------------------------------------
 
+# =========================================================
+# CONFIG
+# =========================================================
+
+st.set_page_config(
+    page_title="EGX Market Intelligence",
+    layout="wide"
+)
+
+st.sidebar.title("EGX Market")
+
+page = st.sidebar.radio(
+    "Navigation",
+    ["Overview", "Scraping", "Company Analysis", "Network Analysis", "Gainers & Losers", "Sector Analysis"]
+)
+
+
+# =========================================================
+# LOADER
+# =========================================================
+
+@st.cache_data
 def loader():
     analyzer = EgxAnalyzer(DATA_DIR)
 
     if not analyzer.load_data():
-        return None,None,None
-    
-    analyzer.clean()
+        return None, None, None
 
+    analyzer.clean()
     analyzer.checker()
 
     viz = EgxVisualization(analyzer)
@@ -36,125 +57,203 @@ def loader():
     return analyzer, viz, scraper
 
 
-st.set_page_config(page_title="EGX Market", layout="wide")
-st.sidebar.title("EGX Market")
-page = st.sidebar.radio(
-    "Navigate",
-    ["Overview", "Scraping", "Company analysis", "Network analysis", "Gainers & Losers", "Sector"]
-)
-
 analyzer, viz, scraper = loader()
 
 if analyzer is None:
-    st.error("Could not load data. Please check if raw.csv and stock_data.csv exist in the data folder.")
+    st.error("Missing dataset files (raw.csv / stock_data.csv)")
     st.stop()
 
-if page == "Overview":
-    st.title("EGX Market Overview")
-    st.info("This dashboard analyzes 32 Shariah-compliant companies on the EGX from June to December 2025. Using 4,640 records from Yahoo Finance and African Markets, it evaluates stock performance, risk (volatility), and sector-level trends to provide deep financial insights into the Egyptian market's behavior")
-    c1 , c2 , c3 = st.columns(3)
-    c1.metric("Total Companies", analyzer.df["Company"].nunique())
-    c2.metric("Total Data Points", len(analyzer.df))
-    c3.metric("Sectors Covered", len(analyzer.SECTORS))
-    st.subheader("Recent Market Data")
-    st.dataframe(analyzer.df.head(10), use_container_width=True)
 
+# =========================================================
+# OVERVIEW 
+# =========================================================
+
+if page == "Overview":
+
+    st.title("EGX Market Overview")
+
+    st.caption("High-level snapshot of Egyptian equity market behavior")
+
+    c1, c2, c3 = st.columns(3)
+
+    c1.metric("Companies", analyzer.df["Company"].nunique())
+    c2.metric("Records", len(analyzer.df))
+    c3.metric("Sectors", len(analyzer.SECTORS))
+
+    st.divider()
+
+    st.subheader("Market Index (Normalized)")
+
+    market = analyzer.df.groupby("Date")["Close"].mean().reset_index()
+    market["Index"] = market["Close"] / market["Close"].iloc[0] * 100
+
+    st.line_chart(market.set_index("Date")["Index"])
+
+    st.divider()
+
+    st.subheader("Sector Distribution")
+
+    st.bar_chart(analyzer.df["Sector"].value_counts())
+
+
+# =========================================================
+# SCRAPING
+# =========================================================
 
 elif page == "Scraping":
-    st.title("Scraper")
 
-    start = st.date_input("Start")
-    end = st.date_input("End")
+    st.title("Data Scraping")
 
-    if st.button("Yahoo Api"):
+    start = st.date_input("Start Date")
+    end = st.date_input("End Date")
 
-        df = scraper.api(start.isoformat(),end.isoformat())
+    c1, c2 = st.columns(2)
 
-        if not df.empty:
-            scraper.save_csv(df, os.path.join(DATA_DIR, "raw.csv"))
-            st.rerun()
-            st.success("Saved")
+    with c1:
+        if st.button("Yahoo Finance API"):
+            df = scraper.api(start.isoformat(), end.isoformat())
+            if not df.empty:
+                scraper.save_csv(df, os.path.join(DATA_DIR, "raw.csv"))
+                st.success("Data saved")
+                st.rerun()
 
-    elif st.button("African Markets"):
+    with c2:
+        if st.button("African Markets Scraper"):
+            df = scraper.african_markets_scraper()
+            if not df.empty:
+                scraper.save_csv(df, os.path.join(DATA_DIR, "raw.csv"))
+                st.success("Data saved")
+                st.rerun()
 
-        df = scraper.african_markets_scraper()
 
-        if not df.empty:
-            scraper.save_csv(df, os.path.join(DATA_DIR, "raw.csv"))
-            st.rerun()
-            st.success("Saved")
+# =========================================================
+# COMPANY ANALYSIS 
+# =========================================================
 
-elif page == "Company analysis":
+elif page == "Company Analysis":
 
     st.title("Company Analysis")
-    names = analyzer.company_names()
-    company = st.selectbox("company",names)
+
+    company = st.selectbox("Select Company", analyzer.company_names())
 
     data = analyzer.specific_company(company)
 
     if data is None:
-        st.error("No data")
+        st.error("No data available for this company")
         st.stop()
-    
-    c1 ,c2 ,c3 ,c4 = st.columns(4)
+
+    ticker = analyzer.get_ticker(company)
+
+    st.subheader(f"{company} ({ticker})")
+
+    st.caption("Price behavior, performance metrics, and risk profile")
+
+
+
+    c1, c2, c3, c4, c5 = st.columns(5)
+
     c1.metric("Sector", data["sector"])
-    c2.metric("YTD", data["ytd"])
-    c3.metric("Close", f"{data['latest']['close']:.2f}")
+    c2.metric("YTD Return", data["ytd"])
+    c3.metric("Last Price", f"{data['latest']['close']:.2f}")
     c4.metric("Volatility", f"{data['risk']['annualized_volatility']:.2f}%")
+    c5.metric("Ticker", ticker)
 
-    df_plot = analyzer.df[analyzer.df["Company"] == company]
+    st.divider()
 
-    fig = px.line(df_plot, x="Date", y="Close", title=f"{company} Price Trend")
+    df_plot = analyzer.df[analyzer.df["Company"] == company].copy()
 
-    st.plotly_chart(fig, use_container_width=True)
+    # =====================================================
+    # PRICE + MONTHLY PERFORMANCE
+    # =====================================================
 
-    st.title("Monthly Volatility (Risk)")
+    left, right = st.columns(2)
 
-    MonthVol = viz.plot_rolling_volatility(company)
+    with left:
+        st.subheader("Price Trend")
+        st.plotly_chart(px.line(df_plot, x="Date", y="Close"), use_container_width=True)
 
-    st.plotly_chart(MonthVol,use_container_width=True)    
+    with right:
+        st.subheader("Monthly Returns")
 
-    st.title("Volatility (Risk)")
+        df_plot["Month"] = pd.to_datetime(df_plot["Date"]).dt.to_period("M").astype(str)
 
-    vol = viz.PlotVolatility()
-    st.pyplot(vol,use_container_width=True)
+        monthly = df_plot.groupby("Month")["Close"].agg(["first", "last"])
+        monthly["Return %"] = ((monthly["last"] - monthly["first"]) / monthly["first"]) * 100
+
+        st.bar_chart(monthly["Return %"])
+
+    st.divider()
+
+    # =====================================================
+    # RISK 
+    # =====================================================
+
+    st.subheader("Risk Analysis")
+
+    st.plotly_chart(viz.plot_rolling_volatility(company), use_container_width=True)
+
+    st.divider()
+
+    st.subheader("Monthly Breakdown Table")
+
+    st.dataframe(monthly)
 
 
-elif page == "Network analysis":
-    
+# =========================================================
+# NETWORK ANALYSIS (NOW INCLUDES VOLATILITY DISTRIBUTION)
+# =========================================================
+
+elif page == "Network Analysis":
+
     st.title("Market Network Analysis")
-    st.write("Graph visualizing company clusters grouped by their sectors.")
+
+    st.caption("Sector relationships and market risk structure")
+
+    st.divider()
+
+    st.subheader("Sector Network Graph")
     st.pyplot(viz.networkx_sector())
+    
+    st.divider()
+    
+    st.subheader("Market Volatility Distribution")
+    st.pyplot(viz.PlotVolatility())
 
 
-elif page == "Sector":
+# =========================================================
+# SECTOR ANALYSIS
+# =========================================================
+
+elif page == "Sector Analysis":
+
     st.title("Sector Performance")
-    st.write("Visualizes the performance of a 10,000 EGP investment per sector.")
-    sector_plt = viz.PlotSector_Growth()
 
-    st.plotly_chart(sector_plt, use_container_width=True)
+    st.plotly_chart(viz.PlotSector_Growth(), use_container_width=True)
 
+
+# =========================================================
+# GAINERS & LOSERS
+# =========================================================
 
 elif page == "Gainers & Losers":
 
-    st.title("Top Gainers & Losers")
-    col1, col2 = st.columns(2)
+    st.title("Market Leaders")
 
-    with col1:
+    c1, c2 = st.columns(2)
+
+    with c1:
+        st.subheader("Top Gainers")
         st.pyplot(viz.plot_gainers(5))
 
-    with col2:
+    with c2:
+        st.subheader("Top Losers")
         st.pyplot(viz.plot_losers(5))
-        
+
+    st.divider()
+
+    st.subheader("Monthly Heatmap")
+
     monthly_perf = analyzer.get_monthly()
-
     top_companies = analyzer.df["Company"].value_counts().head(15).index.tolist()
-    fig = viz.heatmap(top_companies, monthly_perf)
-    
-    st.title("Heatmap - Monthly Returns")
 
-    st.pyplot(fig)
-    
-        
-
-
+    st.pyplot(viz.heatmap(top_companies, monthly_perf))
