@@ -269,15 +269,22 @@ class EgxAnalyzer:
         return risk.sort_values('Ann_Volatility', ascending=False).to_dict('records')
 
     def get_ticker(self, company_name):
-        df = self.df.copy()
+       df = self.df.copy()
 
-        row = df[df["Company"] == company_name]
+       row = df[df["Company"] == company_name]
 
-        if row.empty:
-            return "N/A"
+       if row.empty:
+           return company_name
 
-        # safest unique ticker extraction
-        return row["Symbol"].dropna().iloc[0]
+       if "Symbol" not in df.columns:
+           return company_name
+
+       symbols = row["Symbol"].dropna()
+
+       if symbols.empty:
+          return company_name
+
+       return symbols.iloc[0]
 
     def get_sector_growth_data(self):
 
