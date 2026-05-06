@@ -33,7 +33,7 @@ st.sidebar.title("EGX Market")
 
 page = st.sidebar.radio(
     "Navigation",
-    ["Overview", "Scraping", "Company Analysis", "Network Analysis", "Gainers & Losers", "Sector Analysis"]
+    ["Overview", "Scraping", "Company Analysis", "Network Analysis", "Gainers & Losers", "Sector Analysis", "3D Analysis", "Summary"]
 )
 
 
@@ -72,29 +72,31 @@ if page == "Overview":
 
     st.title("EGX Market Overview")
 
-    st.caption("High-level snapshot of Egyptian equity market behavior")
-
+    st.caption(f"Egyptian Stock Market Analysis of {analyzer.df['Company'].nunique()} Companies")
+    
     c1, c2, c3 = st.columns(3)
 
     c1.metric("Companies", analyzer.df["Company"].nunique())
     c2.metric("Records", len(analyzer.df))
     c3.metric("Sectors", len(analyzer.SECTORS))
 
-    st.divider()
+    st.write("""
+    ## Project Overview
+    This project analyzes the Egyptian Stock Exchange (EGX)
 
-    st.subheader("Market Index (Normalized)")
+    It helps us understand:
+    - How companies perform in the market  
+    - Market trends over time  
+    - Differences between sectors  
 
-    market = analyzer.df.groupby("Date")["Close"].mean().reset_index()
-    market["Index"] = market["Close"] / market["Close"].iloc[0] * 100
+    The project includes:
+    - Collecting stock data  
+    - Cleaning and organizing it  
+    - Calculating financial indicators  
+    - Building visual charts for analysis  
 
-    st.line_chart(market.set_index("Date")["Index"])
-
-    st.divider()
-
-    st.subheader("Sector Distribution")
-
-    st.bar_chart(analyzer.df["Sector"].value_counts())
-
+    Made by **Abdel-Rahman & Omar Saeed**.
+    """)
 
 # =========================================================
 # SCRAPING
@@ -163,7 +165,7 @@ elif page == "Company Analysis":
     df_plot = analyzer.df[analyzer.df["Company"] == company].copy()
 
     # =====================================================
-    # PRICE + MONTHLY PERFORMANCE
+    # PRICE and MONTHLY PERFORMANCE
     # =====================================================
 
     left, right = st.columns(2)
@@ -257,3 +259,76 @@ elif page == "Gainers & Losers":
     top_companies = analyzer.df["Company"].value_counts().head(15).index.tolist()
 
     st.pyplot(viz.heatmap(top_companies, monthly_perf))
+
+elif page =="3D Analysis":
+    
+    st.title("3D Market Analysis")
+
+    st.subheader("Monthly Returns 3D View")
+
+    fig = viz.ThreeD_plt()
+    st.pyplot(fig)
+
+elif page == "Summary":
+
+    summary = analyzer.get_summary_page_data()
+
+    st.title("EGX Market Summary Dashboard")
+
+    # =========================
+    # MARKET OVERVIEW
+    # =========================
+    st.subheader("Market Overview")
+
+    col1, col2, col3, col4 = st.columns(4)
+
+    col1.metric("Companies", summary["market_overview"]["total_companies"])
+    col2.metric("Sectors", summary["market_overview"]["active_sectors"])
+    col3.metric("Avg Return (%)", round(summary["market_overview"]["avg_daily_return"], 2))
+    col4.metric("Avg Volatility (%)", round(summary["market_overview"]["avg_volatility"], 2))
+
+    st.divider()
+
+    # =========================
+    # SECTORS
+    # =========================
+    st.subheader("Sector Performance")
+
+    st.dataframe(summary["sector_stats"], use_container_width=True)
+
+    st.divider()
+
+    # =========================
+    # TOP MOVERS
+    # =========================
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.subheader("Top Gainers")
+        st.dataframe(summary["top_gainers"], use_container_width=True)
+
+    with col2:
+        st.subheader("Top Losers")
+        st.dataframe(summary["top_losers"], use_container_width=True)
+
+    st.divider()
+
+    # =========================
+    # RISK
+    # =========================
+    st.subheader("Most Volatile Stocks")
+
+    st.dataframe(summary["most_volatile"], use_container_width=True)
+
+    st.divider()
+
+    # =========================
+    # MARKET STATS
+    # =========================
+    st.subheader("Market Statistics")
+
+    col1, col2, col3 = st.columns(3)
+
+    col1.metric("Avg Price", round(summary["market_stats"]["avg_price"], 2))
+    col2.metric("Avg Market Cap", round(summary["market_stats"]["avg_market_cap"], 2))
+    col3.metric("Total Volume", int(summary["market_stats"]["total_volume"]))

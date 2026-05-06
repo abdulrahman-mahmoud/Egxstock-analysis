@@ -357,7 +357,94 @@ class EgxAnalyzer:
             losers  = month_data.nsmallest(n, 'Monthly_Return')[['Company', 'Monthly_Return']].assign(Type='Loser',  Month=month)
             results.extend([gainers, losers])
         return pd.concat(results, ignore_index=True)
-
-
-
     
+    def get_summary_page_data(self):
+
+        if self.df is None or self.df.empty:
+            return {}
+
+        df = self.df.copy()
+
+        # =========================
+        # 1. MARKET OVERVIEW
+        # =========================
+        market_overview = {
+            "total_companies": df['Company'].nunique(),
+            "total_rows": len(df),
+            "avg_daily_return": df['Daily_Return'].mean() * 100,
+            "avg_volatility": df['Daily_Return'].std() * np.sqrt(self.TRADING_DAYS) * 100,
+            "active_sectors": df['Sector'].nunique()
+        }
+
+        # =========================
+        # 2. SECTOR BREAKDOWN
+        # =========================
+        sector_stats = (
+            df.groupby('Sector')
+            .agg(
+                companies=('Company', 'nunique'),
+                avg_return=('Daily_Return', 'mean'),
+                avg_volatility=('Daily_Return', 'std')
+            )
+            .reset_index()
+        )
+
+        sector_stats['avg_return'] *= 100
+        sector_stats['avg_volatility'] *= np.sqrt(self.TRADING_DAYS) * 100
+
+        # =========================
+        # 3. TOP / WORST COMPANIES
+        # =========================
+        latest = df.sort_values('Date').groupby('Company').tail(1)
+
+        top_gainers = latest.nlargest(5, 'Total_Gain')[['Company', 'Total_Gain', 'Sector']]
+        top_losers = latest.nsmallest(5, 'Total_Gain')[['Company', 'Total_Gain', 'Sector']]
+
+        if 'Daily_Return' in latest.columns:
+            volatile = (
+                df.groupby('Company')['Daily_Return']
+                .std()
+                .sort_values(ascending=False)
+                .head(5)
+                .reset_index(name='Volatility')
+            )
+        else:
+            volatile = pd.DataFrame()
+
+        # =========================
+        # 4. MARKET STATS
+        # =========================
+        market_stats = {
+            "avg_price": df['Close'].mean(),
+            "avg_market_cap": df['MarketCap'].mean(),
+            "total_volume": df['Volume'].sum()
+        }
+
+
+        # =========================
+        # FINAL OUTPUTs
+        # =========================
+        return {
+            "market_overview": market_overview,
+            "sector_stats": sector_stats.to_dict('records'),
+            "top_gainers": top_gainers.to_dict('records'),
+            "top_losers": top_losers.to_dict('records'),
+            "most_volatile": volatile.to_dict('records') if not volatile.empty else [],
+            "market_stats": market_stats,
+        }
+    
+
+    def threeD(self):
+
+        self.df['Date'] = pd.to_datetime(self.df['Date'])
+
+        self.df = self.df.sort_values(['Company', 'Date'])
+
+        self.df['Month'] = self.df['Date'].dt.to_period('M').astype(str)
+
+        # Monthly return calculation
+        perf = self.df.groupby(['Company', 'Month'])['Close'].agg(['first', 'last']).reset_index()
+
+        perf['Return'] = (perf['last'] / perf['first'] - 1) * 100
+
+        return perf

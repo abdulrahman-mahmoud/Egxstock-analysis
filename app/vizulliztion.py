@@ -239,5 +239,46 @@ class EgxVisualization:
 
         plt.tight_layout()
         return fig
+    
 
-        
+    def ThreeD_plt(self):
+
+        monthly = self.data.get_monthly()
+
+        plot_df = monthly.pivot(
+            index='Company',
+            columns='Month',
+            values='Monthly_Return'
+        ).fillna(0)
+
+        plot_df = plot_df.iloc[:10, -6:]
+
+        rows, cols = plot_df.shape
+
+        x_pos, y_pos = np.meshgrid(np.arange(cols), np.arange(rows))
+
+        x = x_pos.ravel()
+        y = y_pos.ravel()
+        z = np.zeros_like(x, dtype=float)
+
+        dz = plot_df.values.ravel()
+
+        fig = plt.figure(figsize=(11, 7))
+        ax = fig.add_subplot(111, projection='3d')
+
+        colors = np.where(dz >= 0, 'green', 'red')
+
+        ax.scatter3D(x, y, dz, c=colors, alpha=0.8)
+
+        ax.set_xticks(np.arange(cols))
+        ax.set_xticklabels(plot_df.columns, rotation=45, ha='right')
+
+        ax.set_yticks(np.arange(rows))
+        ax.set_yticklabels(plot_df.index)
+
+        ax.set_zlabel('Monthly Return %')
+        ax.set_title('EGX Monthly Returns (3D View)')
+
+        plt.tight_layout()
+
+        return fig

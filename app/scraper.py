@@ -197,15 +197,18 @@ class EgxScraper:
 
         options = Options()
 
-        options.add_argument("--headless")
+        options.add_argument("--headless=new")
         options.add_argument("--disable-gpu")
         options.add_argument("--no-sandbox")
+        options.add_argument("--disable-dev-shm-usage")
 
-        driver = webdriver.Chrome(
-            options=options
-        )
+        driver = None
 
         try:
+
+            driver = webdriver.Chrome(
+                options=options
+            )
 
             url = "https://www.african-markets.com/en/stock-markets/egx/listed-companies"
 
@@ -227,11 +230,11 @@ class EgxScraper:
                     "td"
                 )
 
-                if cells:
+                if len(cells) >= 7:
 
                     row_data = [
                         cell.text.strip()
-                        for cell in cells
+                        for cell in cells[:7]
                     ]
 
                     data.append(row_data)
