@@ -123,7 +123,7 @@ elif page == "Scraping":
         if st.button("African Markets Scraper"):
             df = scraper.african_markets_scraper()
             if not df.empty:
-                scraper.save_csv(df, os.path.join(DATA_DIR, "raw.csv"))
+                scraper.save_csv(df, os.path.join(DATA_DIR, "stock_data.csv"))
                 st.success("Data saved")
                 st.rerun()
 
