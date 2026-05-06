@@ -73,7 +73,7 @@ if page == "Overview":
     st.title("EGX Market Overview")
 
     st.caption(f"Egyptian Stock Market Analysis of {analyzer.df['Company'].nunique()} Companies")
-    
+
     c1, c2, c3 = st.columns(3)
 
     c1.metric("Companies", analyzer.df["Company"].nunique())
@@ -196,9 +196,6 @@ elif page == "Company Analysis":
 
     st.divider()
 
-    st.subheader("Monthly Breakdown Table")
-
-    st.dataframe(monthly)
 
 
 # =========================================================
