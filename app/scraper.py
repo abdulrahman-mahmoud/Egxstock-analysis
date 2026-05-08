@@ -264,7 +264,8 @@ class EgxScraper:
 
         finally:
 
-            driver.quit()
+            if driver is not None:
+                driver.quit()
 
     # ==========================================
     # Save CSV

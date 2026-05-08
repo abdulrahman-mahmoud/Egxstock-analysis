@@ -1,217 +1,236 @@
-# EGX Stocks & Currency Data Acquisition
+# EGX Stock Analysis
 
-> A modular Python framework for acquiring, processing, and visualizing financial data from the **Egyptian Exchange (EGX)** — built for academic research and practical finance applications.
+This repository is a Python-based EGX stock analysis project built around a Streamlit dashboard, local CSV datasets, scraping utilities, and notebook-based exploration.
 
----
+It documents a practical workflow for:
 
-## Table of Contents
-
-- [Overview](#overview)
-- [Features](#features)
-- [Project Structure](#project-structure)
-- [Installation](#installation)
-- [Usage](#usage)
-- [Data Sources](#data-sources)
-- [Visualizations](#visualizations)
-- [GUI Dashboard](#gui-dashboard)
-- [Requirements](#requirements)
-- [Notes](#notes)
-
----
+- collecting historical EGX stock data from Yahoo Finance
+- scraping company snapshot data from African Markets
+- experimenting with live quote scraping from Mubasher
+- cleaning and aligning market datasets
+- calculating returns, volatility, sector growth, and summary metrics
+- visualizing results through charts, network graphs, and a dashboard
 
 ## Overview
 
-This project provides end-to-end tooling for EGX market data: scraping live stock prices and currency rates, cleaning and structuring the data, modeling relationships via graph analysis, and presenting insights through heatmaps, 3D point clouds, and an interactive desktop dashboard.
+The codebase is centered on the Egyptian Exchange (EGX). It combines a small app layer in `app/`, stored datasets in `data/`, notebook work in `Proessing/`, and bundled PDF reports in `data/pdf/`.
 
-It was developed as a two-phase academic project and is designed to be **scalable**, **reusable**, and easy to extend.
+The main shipped interface is a Streamlit dashboard in [GuiMaking.py](/d:/Projects/Egy%20stock%20egyx33/Egxstock-analysis/app/GuiMaking.py). That dashboard loads the local CSV files, lets the user refresh parts of the data through scraping, and presents charts for company-level, sector-level, and market-level analysis.
 
----
+## What We Used
 
-## Features
+### Libraries
 
-### Data Collection
-| Method | Source | Purpose |
-|---|---|---|
-| `BeautifulSoup` | `mubasher.info` | Live stock prices, EGX indices, sector data, company fundamentals |
-| `Selenium` | `stockanalysis.com` | Full ticker list, per-stock financials, market cap data |
-| `Selenium` | `african-markets.com` | EGX30 index history, weekly summaries, listed companies |
-| `yfinance` | Yahoo Finance | Historical OHLCV data for EGX-listed tickers (`.CA` suffix) |
-| `SerpApi` | Google Finance | Fallback — stock price, movement, and news via search |
+The project currently uses these libraries from [requirements.txt](/d:/Projects/Egy%20stock%20egyx33/Egxstock-analysis/requirements.txt):
 
-### Data Processing
-- **Cleaning & normalization** of raw scraped data (handling missing values, type casting, deduplication)
-- **Graph construction** via `NetworkX` — models co-traded stocks, sector relationships, and currency correlations
+- `pandas`
+- `numpy`
+- `streamlit`
+- `plotly`
+- `matplotlib`
+- `networkx`
+- `seaborn`
+- `yfinance`
+- `requests`
+- `beautifulsoup4`
+- `selenium`
+- `ipykernel`
 
-### Visualization & Insights
-- **Network graphs** — identify key stocks (high-degree nodes) and sector communities via community detection
-- **Heatmaps** — pricing trends across sectors, currency fluctuation over time
-- **3D Point Cloud** — clustering of stocks by price, volume, and performance metrics
+### Data Sources
 
-### GUI Dashboard
-- Built with `Tkinter`, organized across **7 tabs**
-- Covers: live data view, historical charts, network graph explorer, heatmap viewer, point cloud, sector breakdown, and settings
-- Threaded data fetching to keep the UI responsive
+The data sources referenced in the Python files and notebooks are:
 
----
+- `Yahoo Finance` through `yfinance` for historical EGX stock price data
+- `African Markets` for company, sector, YTD, and market cap snapshot data
+- `Mubasher` for live quote scraping experiments
 
-## Project Structure
+### Tools and Runtime Dependencies
 
+- `Streamlit` powers the main dashboard UI
+- `Plotly` is used for interactive line charts inside the dashboard
+- `Matplotlib`, `Seaborn`, and `NetworkX` are used for static analysis and plotting
+- `Selenium` is used for dynamic scraping and requires a working Chrome / Chromedriver setup
+- `Jupyter notebooks` in `Proessing/` capture the exploratory and academic workflow behind the app
+
+## Repository Structure
+
+```text
+Egxstock-analysis/
++-- app/
+|   +-- analyzer.py
+|   +-- scraper.py
+|   +-- GuiMaking.py
+|   +-- vizulliztion.py
++-- data/
+|   +-- raw.csv
+|   +-- stock_data.csv
+|   +-- pdf/
+|       +-- EGX Stock Market - Data Acquisition.pdf
+|       +-- EGX Stock Market- Journey Report.pdf
++-- Proessing/
+|   +-- cleaning_analysis.ipynb
+|   +-- scrapers/
+|       +-- api_fetcher.ipynb
+|       +-- Bs4.ipynb
+|       +-- SeleniumProject.ipynb
++-- requirements.txt
++-- README.md
 ```
-egx-data-acquisition/
-│
-├── data/
-│   ├── raw/                  # Raw scraped output (CSV, JSON)
-│   └── processed/            # Cleaned and normalized datasets
-│
-├── scrapers/
-│   ├── bs4_scraper.py        # BeautifulSoup-based scraper
-│   ├── selenium_scraper.py   # Selenium scraper for dynamic content
-│   └── api_fetcher.py        # yfinance + SerpApi + REST integrations
-│
-├── processing/
-│   ├── cleaner.py            # Data cleaning and normalization
-│   └── graph_builder.py      # NetworkX graph construction
-│
-├── visualization/
-│   ├── network_viz.py        # Network graph plots and community detection
-│   ├── heatmap.py            # Seaborn/Matplotlib heatmaps
-│   └── point_cloud.py        # 3D scatter / point cloud analysis
-│
-├── gui/
-│   └── dashboard.py          # Tkinter 7-tab dashboard (main entry point)
-│
-├── requirements.txt
-├── .env.example              # API key template
-└── README.md
-```
 
----
+## Core Modules
+
+### `app/GuiMaking.py`
+
+This is the main Streamlit entrypoint. It loads the analyzer, visualization, and scraper classes, then exposes these dashboard pages:
+
+- `Overview`
+- `Scraping`
+- `Company Analysis`
+- `Network Analysis`
+- `Gainers & Losers`
+- `Sector Analysis`
+- `3D Analysis`
+- `Summary`
+
+### `app/analyzer.py`
+
+`EgxAnalyzer` handles the main data logic:
+
+- loads `data/raw.csv` and `data/stock_data.csv`
+- cleans dates and numeric fields
+- aligns company names across sources
+- builds sector mappings and fallback metadata
+- calculates daily returns, total gain, rolling volatility, and portfolio growth
+- prepares monthly performance, gainers/losers, sector growth, and summary-page metrics
+
+### `app/scraper.py`
+
+`EgxScraper` provides three data collection paths:
+
+- `api(start_date, end_date)` downloads historical stock data with `yfinance`
+- `african_markets_scraper()` uses Selenium to scrape listed company data from African Markets
+- `mubasher_live_quotes()` uses `requests` and `BeautifulSoup` to parse live quote rows from Mubasher
+
+It also includes helpers to save and load CSV files.
+
+### `app/vizulliztion.py`
+
+`EgxVisualization` builds the charts used by the app:
+
+- sector network graph
+- annualized volatility bar chart
+- sector growth chart
+- rolling volatility line chart
+- monthly return heatmap
+- top gainers and top losers charts
+- 3D monthly return scatter plot
+
+## Data Files
+
+The repository already includes two CSV datasets used by the dashboard.
+
+### `data/raw.csv`
+
+File: [raw.csv](/d:/Projects/Egy%20stock%20egyx33/Egxstock-analysis/data/raw.csv)
+
+Purpose:
+- historical OHLCV-style stock data used for most of the analysis views
+
+Observed columns:
+- `Company`
+- `Symbol`
+- `Date`
+- `Open`
+- `High`
+- `Low`
+- `Close`
+- `Adj Close`
+- `Volume`
+
+Current repo snapshot:
+- 2449 rows
+- 9 columns
+
+### `data/stock_data.csv`
+
+File: [stock_data.csv](/d:/Projects/Egy%20stock%20egyx33/Egxstock-analysis/data/stock_data.csv)
+
+Purpose:
+- company-level market snapshot data used to attach sector, price, YTD, and market cap metadata
+
+Observed columns:
+- `Company`
+- `Sector`
+- `Price`
+- `1D`
+- `YTD`
+- `M.Cap`
+- `Date`
+
+Current repo snapshot:
+- 317 rows
+- 7 columns
+
+Current quirk:
+- the file contains a duplicated header row as the first data row, so anyone inspecting the raw CSV directly should expect to see `Company,Sector,Price,1D,YTD,M.Cap,Date` repeated once inside the data body
+
+## Notebooks And Reports
+
+### Notebooks in `Proessing/`
+
+The `Proessing/` folder contains notebook work that appears to support the app and document the project workflow.
+
+- [cleaning_analysis.ipynb](/d:/Projects/Egy%20stock%20egyx33/Egxstock-analysis/Proessing/cleaning_analysis.ipynb): main cleaning and analysis notebook
+- [api_fetcher.ipynb](/d:/Projects/Egy%20stock%20egyx33/Egxstock-analysis/Proessing/scrapers/api_fetcher.ipynb): Yahoo Finance data collection notebook
+- [Bs4.ipynb](/d:/Projects/Egy%20stock%20egyx33/Egxstock-analysis/Proessing/scrapers/Bs4.ipynb): BeautifulSoup scraping experiment for Mubasher
+- [SeleniumProject.ipynb](/d:/Projects/Egy%20stock%20egyx33/Egxstock-analysis/Proessing/scrapers/SeleniumProject.ipynb): Selenium scraping experiment
+
+### Reports in `data/pdf/`
+
+Supporting PDFs are included here:
+
+- [EGX Stock Market - Data Acquisition.pdf](/d:/Projects/Egy%20stock%20egyx33/Egxstock-analysis/data/pdf/EGX%20Stock%20Market%20-%20Data%20Acquisition.pdf)
+- [EGX Stock Market- Journey Report.pdf](/d:/Projects/Egy%20stock%20egyx33/Egxstock-analysis/data/pdf/EGX%20Stock%20Market-%20Journey%20Report.pdf)
 
 ## Installation
 
+Windows-friendly setup from the repository root:
+
 ```bash
-# 1. Clone the repository
-git clone https://github.com/your-username/egx-data-acquisition.git
-cd egx-data-acquisition
-
-# 2. Create and activate a virtual environment
-python -m venv venv
-source venv/bin/activate        # Windows: venv\Scripts\activate
-
-# 3. Install dependencies
-pip install -r requirements.txt
-
-# 4. Configure API keys
-cp .env.example .env
-# Edit .env and add your SerpApi key and any other credentials
-```
-
----
-
-## Usage
-
-### Launch the GUI Dashboard
-```bash
-python gui/dashboard.py
-```
-
-### Run scrapers individually
-```bash
-# Static scraper (BeautifulSoup)
-python scrapers/bs4_scraper.py
-
-# Dynamic scraper (Selenium) — requires ChromeDriver
-python scrapers/selenium_scraper.py
-
-# Fetch historical data via yfinance / APIs
-python scrapers/api_fetcher.py
-```
-
-### Generate visualizations
-```bash
-python visualization/network_viz.py
-python visualization/heatmap.py
-python visualization/point_cloud.py
-```
-
----
-
-## Data Sources
-
-| Source | Tool | Data |
-|---|---|---|
-| [Mubasher](https://english.mubasher.info/markets/EGX/) | `BeautifulSoup` | Live stock prices, EGX30 & EGX33 indices, sector breakdowns, company fundamentals |
-| [Stock Analysis](https://stockanalysis.com/list/egyptian-stock-exchange/) | `Selenium` | Full EGX ticker list, market cap, per-stock financials and historical data |
-| [African Markets](https://african-markets.com/en/stock-markets/egx) | `Selenium` | EGX30 performance, index history, weekly market summaries, listed companies |
-| [SerpApi](https://serpapi.com/) | API | Google Finance results for EGX stocks — price, movement, news (fallback) |
-| [yfinance](https://pypi.org/project/yfinance/) | API | Historical OHLCV for EGX-listed tickers (use `.CA` suffix e.g. `COMI.CA`) |
-
-> **Note:** SerpApi requires an API key. See `.env.example` for the required variables. All scraping targets are non-government, publicly accessible sources with no heavy bot protection.
-
----
-
-## Visualizations
-
-### Network Graph
-Models relationships between stocks — edges represent co-trading activity or sector membership. Community detection highlights clusters of related equities.
-
-### Heatmap
-Displays price movements or currency fluctuations across time and sector dimensions, built with `seaborn` on a `pandas` pivot table.
-
-### 3D Point Cloud
-Plots each stock as a point in (price, volume, % change) space. K-Means clustering is applied to reveal performance groupings.
-
----
-
-## GUI Dashboard
-
-The `Tkinter` dashboard exposes all project outputs in a single window across 7 tabs:
-
-| Tab | Content |
-|---|---|
-| Live Data | Real-time stock and currency snapshot |
-| Historical | OHLCV chart for any selected ticker |
-| Network | Interactive graph explorer |
-| Heatmap | Sector × time heatmap |
-| Point Cloud | 3D stock clustering |
-| Sectors | Breakdown by EGX sector category |
-| Settings | Scraper config, API key management |
-
-Data fetching runs on background threads so the interface stays responsive during live updates.
-
----
-
-## Requirements
-
-```
-beautifulsoup4
-selenium
-yfinance
-google-search-results   # SerpApi
-networkx
-pandas
-numpy
-matplotlib
-seaborn
-requests
-python-dotenv
-```
-
-Install all at once:
-```bash
+python -m venv .venv
+.venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-> **ChromeDriver** is required for Selenium. Download the version matching your Chrome install from [chromedriver.chromium.org](https://chromedriver.chromium.org/downloads) and add it to your PATH.
+## Run The App
 
----
+Start the Streamlit dashboard from the repository root:
 
-## Notes
+```bash
+streamlit run app/GuiMaking.py
+```
 
-- Data availability depends on EGX site structure — scraper selectors may need updating if the site changes.
-- `yfinance` ticker symbols for EGX stocks follow the format `XXXX.CA` (e.g. `COMI.CA` for CIB).
-- This project was built and tested on Python 3.10+.
+## Data Refresh Workflow
 
----
+To rebuild the shipped CSV files through the dashboard:
 
-*Built as part of a university data acquisition and visualization course — Egyptian Exchange focus, Phase 1 & 2.*
+1. Run the Streamlit app.
+2. Open the `Scraping` page.
+3. Choose the desired start and end dates.
+4. Click `Yahoo Finance API` to refresh `data/raw.csv`.
+5. Click `African Markets Scraper` to refresh `data/stock_data.csv`.
+
+## Notes / Known Constraints
+
+- The README keeps the existing repo names exactly as they appear, including `Proessing`, `GuiMaking.py`, and `vizulliztion.py`.
+- The dashboard expects both `data/raw.csv` and `data/stock_data.csv` to exist before most analysis pages can load.
+- `african_markets_scraper()` depends on Selenium plus a working Chrome / Chromedriver environment.
+- `mubasher_live_quotes()` exists in the scraper module, but the main dashboard flow currently saves historical Yahoo data and African Markets snapshot data, not Mubasher output.
+- `app/analyzer.py` includes name-mapping and fallback metadata logic to reconcile companies across the available datasets.
+
+## Authors
+
+The notebooks identify the project authors as:
+
+- Abdel-Rahman Mahmoud Atai
+- Omar Saeed Abouzeed
