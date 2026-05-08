@@ -131,7 +131,7 @@ The repository already includes two CSV datasets used by the dashboard.
 
 ### `data/raw.csv`
 
-File: [raw.csv](/d:/Projects/Egy%20stock%20egyx33/Egxstock-analysis/data/raw.csv)
+File: [raw.csv](/data/raw.csv)
 
 Purpose:
 - historical OHLCV-style stock data used for most of the analysis views
@@ -153,7 +153,7 @@ Current repo snapshot:
 
 ### `data/stock_data.csv`
 
-File: [stock_data.csv](/d:/Projects/Egy%20stock%20egyx33/Egxstock-analysis/data/stock_data.csv)
+File: [stock_data.csv](/data/stock_data.csv)
 
 Purpose:
 - company-level market snapshot data used to attach sector, price, YTD, and market cap metadata
@@ -180,17 +180,17 @@ Current quirk:
 
 The `Proessing/` folder contains notebook work that appears to support the app and document the project workflow.
 
-- [cleaning_analysis.ipynb](/d:/Projects/Egy%20stock%20egyx33/Egxstock-analysis/Proessing/cleaning_analysis.ipynb): main cleaning and analysis notebook
-- [api_fetcher.ipynb](/d:/Projects/Egy%20stock%20egyx33/Egxstock-analysis/Proessing/scrapers/api_fetcher.ipynb): Yahoo Finance data collection notebook
-- [Bs4.ipynb](/d:/Projects/Egy%20stock%20egyx33/Egxstock-analysis/Proessing/scrapers/Bs4.ipynb): BeautifulSoup scraping experiment for Mubasher
-- [SeleniumProject.ipynb](/d:/Projects/Egy%20stock%20egyx33/Egxstock-analysis/Proessing/scrapers/SeleniumProject.ipynb): Selenium scraping experiment
+- [cleaning_analysis.ipynb](/Proessing/cleaning_analysis.ipynb): main cleaning and analysis notebook
+- [api_fetcher.ipynb](//Proessing/scrapers/api_fetcher.ipynb): Yahoo Finance data collection notebook
+- [Bs4.ipynb](//Proessing/scrapers/Bs4.ipynb): BeautifulSoup scraping experiment for Mubasher
+- [SeleniumProject.ipynb](/Proessing/scrapers/SeleniumProject.ipynb): Selenium scraping experiment
 
 ### Reports in `data/pdf/`
 
 Supporting PDFs are included here:
 
-- [EGX Stock Market - Data Acquisition.pdf](/d:/Projects/Egy%20stock%20egyx33/Egxstock-analysis/data/pdf/EGX%20Stock%20Market%20-%20Data%20Acquisition.pdf)
-- [EGX Stock Market- Journey Report.pdf](/d:/Projects/Egy%20stock%20egyx33/Egxstock-analysis/data/pdf/EGX%20Stock%20Market-%20Journey%20Report.pdf)
+- [EGX Stock Market - Data Acquisition.pdf](/data/pdf/EGX%20Stock%20Market%20-%20Data%20Acquisition.pdf)
+- [EGX Stock Market- Journey Report.pdf](/data/pdf/EGX%20Stock%20Market-%20Journey%20Report.pdf)
 
 ## Installation
 
