@@ -456,24 +456,6 @@ class EgxAnalyzer:
 
         companies_3d_summary = self.get_3d_monthly_data().copy()
 
-        if not companies_3d_summary.empty:
-            latest_months = sorted(companies_3d_summary['Month'].unique())[-6:]
-            companies_3d_summary = companies_3d_summary[
-                companies_3d_summary['Month'].isin(latest_months)
-            ]
-
-            top_companies = (
-                companies_3d_summary.groupby('Company')['Monthly_Volume']
-                .sum()
-                .sort_values(ascending=False)
-                .head(10)
-                .index
-            )
-
-            companies_3d_summary = companies_3d_summary[
-                companies_3d_summary['Company'].isin(top_companies)
-            ]
-
         # =========================
         # FINAL OUTPUTs
         # =========================

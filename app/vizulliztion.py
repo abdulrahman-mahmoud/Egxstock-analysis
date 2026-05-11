@@ -249,37 +249,48 @@ class EgxVisualization:
         if plot_df.empty:
             return px.scatter_3d()
 
-        latest_months = sorted(plot_df['Month'].unique())[-6:]
-        plot_df = plot_df[plot_df['Month'].isin(latest_months)]
+        vol_limit = plot_df['Monthly_Volatility'].median()
+        volume_limit = plot_df['Monthly_Volume'].median()
 
-        top_companies = (
-            plot_df.groupby('Company')['Monthly_Volume']
-            .sum()
-            .sort_values(ascending=False)
-            .head(10)
-            .index
-        )
+        plot_df['Status'] = 'RED'
+        plot_df.loc[
+            (plot_df['Monthly_Return'] > 0) &
+            (plot_df['Monthly_Volatility'] <= vol_limit) &
+            (plot_df['Monthly_Volume'] >= volume_limit),
+            'Status'
+        ] = 'GREEN'
 
-        plot_df = plot_df[plot_df['Company'].isin(top_companies)]
-        plot_df = plot_df.fillna(0)
+        plot_df.loc[
+            (plot_df['Status'] != 'GREEN') &
+            (
+                (plot_df['Monthly_Return'] > 0) |
+                (plot_df['Monthly_Volume'] >= volume_limit)
+            ),
+            'Status'
+        ] = 'ORANGE'
 
         fig = px.scatter_3d(
             plot_df,
-            x='Company',
-            y='Monthly_Return',
-            z='Monthly_Volatility',
-            color='Monthly_Return',
-            size='Monthly_Volume',
+            x='Monthly_Return',
+            y='Monthly_Volatility',
+            z='Monthly_Volume',
+            color='Status',
             hover_name='Company',
             hover_data=['Month', 'Monthly_Return', 'Monthly_Volatility', 'Monthly_Volume'],
-            title='EGX Monthly Returns, Volatility and Volume (3D View)'
+            title='EGX Monthly Returns, Volatility and Volume (3D View)',
+            color_discrete_map={
+                'GREEN': '#2ecc71',
+                'ORANGE': '#f39c12',
+                'RED': '#e74c3c'
+            }
         )
 
         fig.update_layout(
+            legend_title_text='Status',
             scene=dict(
-                xaxis_title='Company',
-                yaxis_title='Monthly Return %',
-                zaxis_title='Monthly Volatility %'
+                xaxis_title='Monthly Return',
+                yaxis_title='Monthly Volatility',
+                zaxis_title='Monthly Volume'
             )
         )
 
