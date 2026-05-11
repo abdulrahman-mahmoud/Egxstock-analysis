@@ -3,6 +3,7 @@ import networkx as nx
 import seaborn as sns
 import pandas as pd
 import numpy as np
+import plotly.express as px
 
 class EgxVisualization:
 
@@ -243,42 +244,43 @@ class EgxVisualization:
 
     def ThreeD_plt(self):
 
-        monthly = self.data.get_monthly()
+        plot_df = self.data.get_3d_monthly_data().copy()
 
-        plot_df = monthly.pivot(
-            index='Company',
-            columns='Month',
-            values='Monthly_Return'
-        ).fillna(0)
+        if plot_df.empty:
+            return px.scatter_3d()
 
-        plot_df = plot_df.iloc[:10, -6:]
+        latest_months = sorted(plot_df['Month'].unique())[-6:]
+        plot_df = plot_df[plot_df['Month'].isin(latest_months)]
 
-        rows, cols = plot_df.shape
+        top_companies = (
+            plot_df.groupby('Company')['Monthly_Volume']
+            .sum()
+            .sort_values(ascending=False)
+            .head(10)
+            .index
+        )
 
-        x_pos, y_pos = np.meshgrid(np.arange(cols), np.arange(rows))
+        plot_df = plot_df[plot_df['Company'].isin(top_companies)]
+        plot_df = plot_df.fillna(0)
 
-        x = x_pos.ravel()
-        y = y_pos.ravel()
-        z = np.zeros_like(x, dtype=float)
+        fig = px.scatter_3d(
+            plot_df,
+            x='Company',
+            y='Monthly_Return',
+            z='Monthly_Volatility',
+            color='Monthly_Return',
+            size='Monthly_Volume',
+            hover_name='Company',
+            hover_data=['Month', 'Monthly_Return', 'Monthly_Volatility', 'Monthly_Volume'],
+            title='EGX Monthly Returns, Volatility and Volume (3D View)'
+        )
 
-        dz = plot_df.values.ravel()
-
-        fig = plt.figure(figsize=(11, 7))
-        ax = fig.add_subplot(111, projection='3d')
-
-        colors = np.where(dz >= 0, 'green', 'red')
-
-        ax.scatter3D(x, y, dz, c=colors, alpha=0.8)
-
-        ax.set_xticks(np.arange(cols))
-        ax.set_xticklabels(plot_df.columns, rotation=45, ha='right')
-
-        ax.set_yticks(np.arange(rows))
-        ax.set_yticklabels(plot_df.index)
-
-        ax.set_zlabel('Monthly Return %')
-        ax.set_title('EGX Monthly Returns (3D View)')
-
-        plt.tight_layout()
+        fig.update_layout(
+            scene=dict(
+                xaxis_title='Company',
+                yaxis_title='Monthly Return %',
+                zaxis_title='Monthly Volatility %'
+            )
+        )
 
         return fig

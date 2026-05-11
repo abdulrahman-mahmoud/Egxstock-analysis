@@ -261,10 +261,10 @@ elif page =="3D Analysis":
     
     st.title("3D Market Analysis")
 
-    st.subheader("Monthly Returns 3D View")
+    st.subheader("Monthly Return, Volatility and Volume 3D View")
 
     fig = viz.ThreeD_plt()
-    st.pyplot(fig)
+    st.plotly_chart(fig, use_container_width=True)
 
 elif page == "Summary":
 
@@ -316,6 +316,12 @@ elif page == "Summary":
     st.subheader("Most Volatile Stocks")
 
     st.dataframe(summary["most_volatile"], use_container_width=True)
+
+    st.divider()
+
+    st.subheader("Companies | 3D Output Summary")
+
+    st.dataframe(summary["companies_3d_summary"], use_container_width=True)
 
     st.divider()
 

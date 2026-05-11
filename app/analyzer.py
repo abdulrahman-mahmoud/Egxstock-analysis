@@ -349,6 +349,40 @@ class EgxAnalyzer:
 
         return monthly_perf.reset_index()
 
+    def get_3d_monthly_data(self):
+        df = self.df.copy()
+
+        df['Month'] = df['Date'].dt.to_period('M')
+
+        returns = (
+            df.sort_values(['Company', 'Date'])
+            .groupby(['Company', 'Month'])['Close']
+            .agg(['first', 'last'])
+            .reset_index()
+        )
+
+        returns['Monthly_Return'] = (returns['last'] / returns['first'] - 1) * 100
+
+        volatility = (
+            df.groupby(['Company', 'Month'])['Daily_Return']
+            .std()
+            .reset_index(name='Monthly_Volatility')
+        )
+
+        volatility['Monthly_Volatility'] *= 100
+
+        volume = (
+            df.groupby(['Company', 'Month'])['Volume']
+            .sum()
+            .reset_index(name='Monthly_Volume')
+        )
+
+        merged = returns.merge(volatility, on=['Company', 'Month'], how='left')
+        merged = merged.merge(volume, on=['Company', 'Month'], how='left')
+        merged['Month'] = merged['Month'].astype(str)
+
+        return merged[['Month', 'Company', 'Monthly_Return', 'Monthly_Volatility', 'Monthly_Volume']]
+
     def top_n_per_month(self,monthly_perf, n=5):
         results = []
         for month in sorted(monthly_perf['Month'].unique()):
@@ -420,6 +454,25 @@ class EgxAnalyzer:
             "total_volume": df['Volume'].sum()
         }
 
+        companies_3d_summary = self.get_3d_monthly_data().copy()
+
+        if not companies_3d_summary.empty:
+            latest_months = sorted(companies_3d_summary['Month'].unique())[-6:]
+            companies_3d_summary = companies_3d_summary[
+                companies_3d_summary['Month'].isin(latest_months)
+            ]
+
+            top_companies = (
+                companies_3d_summary.groupby('Company')['Monthly_Volume']
+                .sum()
+                .sort_values(ascending=False)
+                .head(10)
+                .index
+            )
+
+            companies_3d_summary = companies_3d_summary[
+                companies_3d_summary['Company'].isin(top_companies)
+            ]
 
         # =========================
         # FINAL OUTPUTs
@@ -430,6 +483,7 @@ class EgxAnalyzer:
             "top_gainers": top_gainers.to_dict('records'),
             "top_losers": top_losers.to_dict('records'),
             "most_volatile": volatile.to_dict('records') if not volatile.empty else [],
+            "companies_3d_summary": companies_3d_summary.to_dict('records'),
             "market_stats": market_stats,
         }
     
