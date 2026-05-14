@@ -33,7 +33,7 @@ st.sidebar.title("EGX Market")
 
 page = st.sidebar.radio(
     "Navigation",
-    ["Overview", "Scraping", "Company Analysis", "Network Analysis", "Gainers & Losers", "Sector Analysis", "3D Analysis", "Summary"]
+    ["Overview", "Scraping", "Company Analysis", "Stock Screener", "Network Analysis", "Gainers & Losers", "Sector Analysis", "3D Analysis", "Summary"]
 )
 
 
@@ -139,6 +139,7 @@ elif page == "Company Analysis":
     company = st.selectbox("Select Company", analyzer.company_names())
 
     data = analyzer.specific_company(company)
+    decision = analyzer.company_decision(company)
 
     if data is None:
         st.error("No data available for this company")
@@ -149,6 +150,21 @@ elif page == "Company Analysis":
     st.subheader(f"{company} ({ticker})")
 
     st.caption("Price behavior, performance metrics, and risk profile")
+
+    if decision is not None:
+        st.markdown("### Decision Summary")
+
+        d1, d2, d3 = st.columns(3)
+        d1.metric("Decision Score", f"{decision['decision_score']}/100")
+        d2.metric("Signal", decision["signal"])
+        d3.metric("Timing Hint", decision["timing_hint"])
+
+        st.info(f"Reason: {decision['reason']}")
+
+        if decision["red_flags"]:
+            st.warning("Red Flags: " + " | ".join(decision["red_flags"]))
+        else:
+            st.success("Red Flags: No major risk alerts from the current rule set")
 
 
 
@@ -187,7 +203,7 @@ elif page == "Company Analysis":
     st.divider()
 
     # =====================================================
-    # RISK 
+    # RISK
     # =====================================================
 
     st.subheader("Risk Analysis")
@@ -196,6 +212,56 @@ elif page == "Company Analysis":
 
     st.divider()
 
+
+
+# =========================================================
+# STOCK SCREENER
+# =========================================================
+
+elif page == "Stock Screener":
+
+    st.title("Stock Screener")
+    st.caption("Filter EGX stocks by score, risk, momentum, and sector strength")
+
+    ranked = analyzer.rank_companies()
+
+    if ranked.empty:
+        st.error("No ranked stocks available")
+        st.stop()
+
+    c1, c2, c3, c4 = st.columns(4)
+
+    with c1:
+        only_low_risk = st.checkbox("Low Risk")
+    with c2:
+        only_high_momentum = st.checkbox("High Momentum")
+    with c3:
+        only_strong_sector = st.checkbox("Strong Sector")
+    with c4:
+        only_top_score = st.checkbox("Top Score")
+
+    filtered = analyzer.screen_companies(
+        max_volatility=25 if only_low_risk else None,
+        min_one_month_return=5 if only_high_momentum else None,
+        min_sector_return=2 if only_strong_sector else None,
+        min_score=70 if only_top_score else None,
+    )
+
+    top_n = st.slider("Rows to show", min_value=5, max_value=30, value=10)
+
+    s1, s2, s3 = st.columns(3)
+    s1.metric("Matching Stocks", len(filtered))
+    s2.metric("Top Score", int(filtered["Decision Score"].max()) if not filtered.empty else 0)
+    s3.metric("Average Score", round(filtered["Decision Score"].mean(), 1) if not filtered.empty else 0.0)
+
+    st.dataframe(filtered.head(top_n), use_container_width=True)
+
+    if not filtered.empty:
+        st.subheader("Top Candidates Snapshot")
+        st.dataframe(
+            filtered[["Company", "Signal", "Timing Hint", "Reason", "Red Flags"]].head(5),
+            use_container_width=True
+        )
 
 
 # =========================================================
@@ -268,70 +334,50 @@ elif page =="3D Analysis":
 
 elif page == "Summary":
 
-    summary = analyzer.get_summary_page_data()
+    st.title("Market Summary")
 
-    st.title("EGX Market Summary Dashboard")
+    ranked = analyzer.rank_companies()
 
-    # =========================
-    # MARKET OVERVIEW
-    # =========================
-    st.subheader("Market Overview")
+    if ranked.empty:
+        st.error("No summary data available")
+        st.stop()
 
-    col1, col2, col3, col4 = st.columns(4)
+    best_stock = ranked.iloc[0]
+    risky_stock = ranked.iloc[-1]
 
-    col1.metric("Companies", summary["market_overview"]["total_companies"])
-    col2.metric("Sectors", summary["market_overview"]["active_sectors"])
-    col3.metric("Avg Return (%)", round(summary["market_overview"]["avg_daily_return"], 2))
-    col4.metric("Avg Volatility (%)", round(summary["market_overview"]["avg_volatility"], 2))
+    st.subheader("Best Buy Idea Right Now")
+    st.success(
+        f"{best_stock['Company']} looks like an attractive stock to buy now. "
+        f"It has a decision score of {int(best_stock['Decision Score'])}/100, "
+        f"the signal is {best_stock['Signal'].lower()}, and the trend is {best_stock['Timing Hint'].lower()}."
+    )
 
-    st.divider()
-
-    # =========================
-    # SECTORS
-    # =========================
-    st.subheader("Sector Performance")
-
-    st.dataframe(summary["sector_stats"], use_container_width=True)
-
-    st.divider()
-
-    # =========================
-    # TOP MOVERS
-    # =========================
-    col1, col2 = st.columns(2)
-
-    with col1:
-        st.subheader("Top Gainers")
-        st.dataframe(summary["top_gainers"], use_container_width=True)
-
-    with col2:
-        st.subheader("Top Losers")
-        st.dataframe(summary["top_losers"], use_container_width=True)
+    st.write(
+        f"Why: {best_stock['Reason']}. "
+        f"The stock has a 1 month return of {best_stock['1M Return (%)']:.2f}% "
+        f"and a 3 month return of {best_stock['3M Return (%)']:.2f}%."
+    )
 
     st.divider()
 
-    # =========================
-    # RISK
-    # =========================
-    st.subheader("Most Volatile Stocks")
+    st.subheader("Stock To Be Careful With")
+    st.warning(
+        f"{risky_stock['Company']} looks weaker right now. "
+        f"It has a decision score of {int(risky_stock['Decision Score'])}/100, "
+        f"with a {risky_stock['Signal'].lower()} signal and a {risky_stock['Timing Hint'].lower()} trend."
+    )
 
-    st.dataframe(summary["most_volatile"], use_container_width=True)
+    st.write(
+        f"Why: {risky_stock['Reason']}. "
+        f"Its volatility is {risky_stock['Volatility (%)']:.2f}% "
+        f"and its max drawdown is {risky_stock['Max Drawdown (%)']:.2f}%."
+    )
 
     st.divider()
 
-    st.subheader("Companies | 3D Output Summary")
-
-    st.dataframe(summary["companies_3d_summary"], use_container_width=True)
-
-    st.divider()
-
-    # =========================
-    # MARKET STATS
-    # =========================
-    st.subheader("Market Statistics")
-
-    col1, col2, col3 = st.columns(3)
-
-    col1.metric("Avg Price", round(summary["market_stats"]["avg_price"], 2))
-    col2.metric("Avg Market Cap", round(summary["market_stats"]["avg_market_cap"], 2))
-    col3.metric("Total Volume", int(summary["market_stats"]["total_volume"]))
+    st.subheader("Quick Market Read")
+    top_candidates = ranked.head(3)["Company"].tolist()
+    st.info(
+        "The market summary is now focused on decision support. "
+        f"Based on the current model, the strongest names are {', '.join(top_candidates)}."
+    )

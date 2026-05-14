@@ -10,6 +10,7 @@ plotly
 matplotlib
 networkx
 seaborn
+scikit-fuzzy
 
 # Web Scraping & APIs
 yfinance
