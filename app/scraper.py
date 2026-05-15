@@ -43,7 +43,7 @@ class EgxScraper:
         "UNIT.CA": "Unit Investments",
         "COMI.CA": "Commercial International Bank (Egypt)",
         "HRHO.CA": "Hassan Allam Holding",
-        "EKHO.CA": "El Kahera Housing",
+        "ELKA.CA": "El Kahera Housing",
         "BTFH.CA": "Beltone Financial Holding",
     }
 

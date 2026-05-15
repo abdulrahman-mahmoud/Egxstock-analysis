@@ -42,7 +42,7 @@ page = st.sidebar.radio(
 # =========================================================
 
 @st.cache_data
-def loader():
+def loader(raw_mtime, stock_mtime):
     analyzer = EgxAnalyzer(DATA_DIR)
 
     if not analyzer.load_data():
@@ -57,7 +57,13 @@ def loader():
     return analyzer, viz, scraper
 
 
-analyzer, viz, scraper = loader()
+raw_path = os.path.join(DATA_DIR, "raw.csv")
+stock_path = os.path.join(DATA_DIR, "stock_data.csv")
+
+raw_mtime = os.path.getmtime(raw_path) if os.path.exists(raw_path) else None
+stock_mtime = os.path.getmtime(stock_path) if os.path.exists(stock_path) else None
+
+analyzer, viz, scraper = loader(raw_mtime, stock_mtime)
 
 if analyzer is None:
     st.error("Missing dataset files (raw.csv / stock_data.csv)")

@@ -149,6 +149,16 @@ class EgxAnalyzer:
             return default
         return float(np.clip(value, lower, upper))
 
+    def latest_valid_volume(self, company_data):
+        if 'Volume' not in company_data.columns:
+            return np.nan
+
+        volume_series = company_data['Volume'].replace(0, np.nan).dropna()
+        if volume_series.empty:
+            return np.nan
+
+        return float(volume_series.iloc[-1])
+
     def load_data(self):
         try:
             path1 = os.path.join(self.data, 'raw.csv')
@@ -211,6 +221,13 @@ class EgxAnalyzer:
                     .drop_duplicates(['Company', 'Date'], keep='first')
                     .reset_index(drop=True)
                 )
+
+            if 'Volume' in self.df.columns:
+                # Treat companies with only zero volume as missing data rather than illiquid trading.
+                volume_has_activity = self.df.groupby('Company')['Volume'].transform(
+                    lambda s: s.fillna(0).gt(0).any()
+                )
+                self.df.loc[~volume_has_activity, 'Volume'] = np.nan
 
             for company, info in self.FALLBACK_METADATA.items():
                 if company not in self.company_info_map:
@@ -315,7 +332,7 @@ class EgxAnalyzer:
             'latest': {
                 'date': latest['Date'],
                 'close': float(latest['Close']),
-                'volume': float(latest['Volume']),
+                'volume': self.latest_valid_volume(company_data),
                 'market_cap': float(latest['MarketCap'])
             },
 
@@ -397,8 +414,8 @@ class EgxAnalyzer:
         return_series = company_data['Daily_Return']
 
         latest_close = close_series.iloc[-1]
-        volume_series = company_data['Volume'].dropna()
-        latest_volume = volume_series.iloc[-1] if not volume_series.empty else np.nan
+        latest_volume = self.latest_valid_volume(company_data)
+        volume_data_available = not pd.isna(latest_volume)
         one_month_return = self.safe_pct_return(close_series, self.SHORT_WINDOW)
         three_month_return = self.safe_pct_return(close_series, self.LONG_WINDOW)
 
@@ -408,8 +425,11 @@ class EgxAnalyzer:
             if not recent_returns.empty else np.nan
         )
 
-        avg_volume_30 = company_data['Volume'].dropna().tail(self.VOL_WINDOW).mean()
-        universe_avg_volume = self.df.groupby('Company')['Volume'].mean().median() if self.df is not None else np.nan
+        avg_volume_30 = company_data['Volume'].replace(0, np.nan).dropna().tail(self.VOL_WINDOW).mean()
+        universe_avg_volume = (
+            self.df.groupby('Company')['Volume'].mean().dropna().median()
+            if self.df is not None else np.nan
+        )
 
         sector_name = company_row.get('Sector', 'Unknown')
         sector_return_1m = self.sector_recent_return(sector_name, self.SHORT_WINDOW)
@@ -435,8 +455,10 @@ class EgxAnalyzer:
             red_flags.append("Drawdown has been severe")
         if not pd.isna(positive_days_ratio) and positive_days_ratio < 0.5:
             red_flags.append("Recent sessions have been inconsistent")
-        if not pd.isna(avg_volume_30) and not pd.isna(universe_avg_volume) and avg_volume_30 < universe_avg_volume:
+        if volume_data_available and not pd.isna(avg_volume_30) and not pd.isna(universe_avg_volume) and avg_volume_30 < universe_avg_volume:
             red_flags.append("Liquidity is lighter than the market median")
+        if not volume_data_available:
+            red_flags.append("Volume data is unavailable")
 
         if not pd.isna(three_month_return) and three_month_return >= 8:
             reasons.append("Strong 3-month momentum")
@@ -457,7 +479,7 @@ class EgxAnalyzer:
         if not pd.isna(positive_days_ratio) and positive_days_ratio >= 0.6:
             reasons.append("Buying pressure has been consistent")
 
-        if not pd.isna(avg_volume_30) and not pd.isna(universe_avg_volume) and avg_volume_30 >= universe_avg_volume:
+        if volume_data_available and not pd.isna(avg_volume_30) and not pd.isna(universe_avg_volume) and avg_volume_30 >= universe_avg_volume:
             reasons.append("Liquidity is healthy")
 
         if getattr(self, 'decision_system', None) is None:
@@ -514,7 +536,7 @@ class EgxAnalyzer:
             "red_flags": red_flags[:4],
             "metrics": {
                 "latest_close": float(latest_close) if not pd.isna(latest_close) else np.nan,
-                "latest_volume": float(latest_volume) if not pd.isna(latest_volume) else np.nan,
+                "latest_volume": latest_volume,
                 "one_month_return": float(one_month_return) if not pd.isna(one_month_return) else np.nan,
                 "three_month_return": float(three_month_return) if not pd.isna(three_month_return) else np.nan,
                 "annualized_volatility": float(annualized_volatility) if not pd.isna(annualized_volatility) else np.nan,
@@ -695,7 +717,7 @@ class EgxAnalyzer:
 
         volume = (
             df.groupby(['Company', 'Month'])['Volume']
-            .sum()
+            .sum(min_count=1)
             .reset_index(name='Monthly_Volume')
         )
 
