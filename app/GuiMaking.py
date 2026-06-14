@@ -1,47 +1,42 @@
 import os
 import sys
-import plotly.express as px
-import pandas as pd
 import streamlit as st
-
-# =========================================================
-# PATH SETUP
-# =========================================================
 
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 BASE_DIR = os.path.dirname(APP_DIR)
 DATA_DIR = os.path.join(BASE_DIR, "data")
 
-if APP_DIR not in sys.path:
-    sys.path.insert(0, APP_DIR)
+if BASE_DIR not in sys.path:
+    sys.path.insert(0, BASE_DIR)
 
 from analyzer import EgxAnalyzer
-from scraper import EgxScraper
 from vizulliztion import EgxVisualization
-
-
-# =========================================================
-# CONFIG
-# =========================================================
+from scraper import EgxScraper
 
 st.set_page_config(
     page_title="EGX Market Intelligence",
-    layout="wide"
+    layout="wide",
 )
 
 st.sidebar.title("EGX Market")
 
 page = st.sidebar.radio(
     "Navigation",
-    ["Overview", "Scraping", "Company Analysis", "Stock Screener", "Network Analysis", "Gainers & Losers", "Sector Analysis", "3D Analysis", "Summary"]
+    [
+        "Overview",
+        "Scraping",
+        "Company Analysis",
+        "Stock Screener",
+        "Network Analysis",
+        "Gainers & Losers",
+        "Sector Analysis",
+        "3D Analysis",
+        "Summary",
+    ],
 )
 
 
-# =========================================================
-# LOADER
-# =========================================================
-
-@st.cache_data
+@st.cache_resource
 def loader(raw_mtime, stock_mtime):
     analyzer = EgxAnalyzer(DATA_DIR)
 
@@ -53,7 +48,6 @@ def loader(raw_mtime, stock_mtime):
 
     viz = EgxVisualization(analyzer)
     scraper = EgxScraper()
-
     return analyzer, viz, scraper
 
 
@@ -70,46 +64,36 @@ if analyzer is None:
     st.stop()
 
 
-# =========================================================
-# OVERVIEW 
-# =========================================================
-
 if page == "Overview":
-
     st.title("EGX Market Overview")
-
     st.caption(f"Egyptian Stock Market Analysis of {analyzer.df['Company'].nunique()} Companies")
 
     c1, c2, c3 = st.columns(3)
-
     c1.metric("Companies", analyzer.df["Company"].nunique())
     c2.metric("Records", len(analyzer.df))
-    c3.metric("Sectors", len(analyzer.SECTORS))
+    c3.metric("Sectors", len(analyzer.sector_map or {}))
 
-    st.write("""
-    ## Project Overview
-    This project analyzes the Egyptian Stock Exchange (EGX)
+    st.write(
+        """
+        ## Project Overview
+        This project analyzes the Egyptian Stock Exchange (EGX)
 
-    It helps us understand:
-    - How companies perform in the market  
-    - Market trends over time  
-    - Differences between sectors  
+        It helps us understand:
+        - How companies perform in the market
+        - Market trends over time
+        - Differences between sectors
 
-    The project includes:
-    - Collecting stock data  
-    - Cleaning and organizing it  
-    - Calculating financial indicators  
-    - Building visual charts for analysis  
+        The project includes:
+        - Collecting stock data
+        - Cleaning and organizing it
+        - Calculating financial indicators
+        - Building visual charts for analysis
 
-    Made by **Abdel-Rahman & Omar Saeed**.
-    """)
-
-# =========================================================
-# SCRAPING
-# =========================================================
+        Made by **Abdel-Rahman & Omar Saeed**.
+        """
+    )
 
 elif page == "Scraping":
-
     st.title("Data Scraping")
 
     start = st.date_input("Start Date")
@@ -133,13 +117,7 @@ elif page == "Scraping":
                 st.success("Data saved")
                 st.rerun()
 
-
-# =========================================================
-# COMPANY ANALYSIS 
-# =========================================================
-
 elif page == "Company Analysis":
-
     st.title("Company Analysis")
 
     company = st.selectbox("Select Company", analyzer.company_names())
@@ -154,12 +132,10 @@ elif page == "Company Analysis":
     ticker = analyzer.get_ticker(company)
 
     st.subheader(f"{company} ({ticker})")
-
     st.caption("Price behavior, performance metrics, and risk profile")
 
     if decision is not None:
         st.markdown("### Decision Summary")
-
         d1, d2, d3 = st.columns(3)
         d1.metric("Decision Score", f"{decision['decision_score']}/100")
         d2.metric("Signal", decision["signal"])
@@ -172,10 +148,7 @@ elif page == "Company Analysis":
         else:
             st.success("Red Flags: No major risk alerts from the current rule set")
 
-
-
     c1, c2, c3, c4, c5 = st.columns(5)
-
     c1.metric("Sector", data["sector"])
     c2.metric("YTD Return", data["ytd"])
     c3.metric("Last Price", f"{data['latest']['close']:.2f}")
@@ -184,48 +157,21 @@ elif page == "Company Analysis":
 
     st.divider()
 
-    df_plot = analyzer.df[analyzer.df["Company"] == company].copy()
-
-    # =====================================================
-    # PRICE and MONTHLY PERFORMANCE
-    # =====================================================
-
     left, right = st.columns(2)
-
     with left:
         st.subheader("Price Trend")
-        st.plotly_chart(px.line(df_plot, x="Date", y="Close"), use_container_width=True)
+        st.pyplot(viz.plot_company_price(company), use_container_width=True)
 
     with right:
         st.subheader("Monthly Returns")
-
-        df_plot["Month"] = pd.to_datetime(df_plot["Date"]).dt.to_period("M").astype(str)
-
-        monthly = df_plot.groupby("Month")["Close"].agg(["first", "last"])
-        monthly["Return %"] = ((monthly["last"] - monthly["first"]) / monthly["first"]) * 100
-
-        st.bar_chart(monthly["Return %"])
+        st.pyplot(viz.plot_company_monthly_returns(company), use_container_width=True)
 
     st.divider()
-
-    # =====================================================
-    # RISK
-    # =====================================================
-
     st.subheader("Risk Analysis")
-
-    st.plotly_chart(viz.plot_rolling_volatility(company), use_container_width=True)
-
+    st.pyplot(viz.plot_rolling_volatility(company), use_container_width=True)
     st.divider()
-
-
-
-# =========================================================
-# STOCK SCREENER
-# =========================================================
 
 elif page == "Stock Screener":
-
     st.title("Stock Screener")
     st.caption("Filter EGX stocks by score, risk, momentum, and sector strength")
 
@@ -266,80 +212,49 @@ elif page == "Stock Screener":
         st.subheader("Top Candidates Snapshot")
         st.dataframe(
             filtered[["Company", "Signal", "Timing Hint", "Reason", "Red Flags"]].head(5),
-            use_container_width=True
+            use_container_width=True,
         )
 
-
-# =========================================================
-# NETWORK ANALYSIS 
-# =========================================================
-
 elif page == "Network Analysis":
-
     st.title("Market Network Analysis")
-
     st.caption("Sector relationships and market risk structure")
-
     st.divider()
-
     st.subheader("Sector Network Graph")
-    st.pyplot(viz.networkx_sector())
-    
+    st.pyplot(viz.networkx_sector(), use_container_width=True)
     st.divider()
-    
     st.subheader("Market Volatility Distribution")
-    st.pyplot(viz.PlotVolatility())
-
-
-# =========================================================
-# SECTOR ANALYSIS
-# =========================================================
+    st.pyplot(viz.PlotVolatility(), use_container_width=True)
 
 elif page == "Sector Analysis":
-
     st.title("Sector Performance")
-
-    st.plotly_chart(viz.PlotSector_Growth(), use_container_width=True)
-
-
-# =========================================================
-# GAINERS & LOSERS
-# =========================================================
+    st.pyplot(viz.PlotSector_Growth(), use_container_width=True)
 
 elif page == "Gainers & Losers":
-
     st.title("Market Leaders")
 
     c1, c2 = st.columns(2)
-
     with c1:
         st.subheader("Top Gainers")
-        st.pyplot(viz.plot_gainers(5))
+        st.pyplot(viz.plot_gainers(5), use_container_width=True)
 
     with c2:
         st.subheader("Top Losers")
-        st.pyplot(viz.plot_losers(5))
+        st.pyplot(viz.plot_losers(5), use_container_width=True)
 
     st.divider()
-
     st.subheader("Monthly Heatmap")
 
     monthly_perf = analyzer.get_monthly()
-    top_companies = analyzer.df["Company"].value_counts().head(15).index.tolist()
+    top_companies = analyzer.top_activity_companies(15)
 
-    st.pyplot(viz.heatmap(top_companies, monthly_perf))
+    st.pyplot(viz.heatmap(top_companies, monthly_perf), use_container_width=True)
 
-elif page =="3D Analysis":
-    
+elif page == "3D Analysis":
     st.title("3D Market Analysis")
-
     st.subheader("Monthly Return, Volatility and Volume 3D View")
-
-    fig = viz.ThreeD_plt()
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(viz.ThreeD_plt(), use_container_width=True)
 
 elif page == "Summary":
-
     st.title("Market Summary")
 
     ranked = analyzer.rank_companies()
