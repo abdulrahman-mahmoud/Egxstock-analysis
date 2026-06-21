@@ -3,15 +3,15 @@ import sys
 import streamlit as st
 
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
-BASE_DIR = os.path.dirname(APP_DIR)
-DATA_DIR = os.path.join(BASE_DIR, "data")
+REPO_DIR = os.path.dirname(APP_DIR)
+DATA_DIR = os.path.join(REPO_DIR, "data")
 
-if BASE_DIR not in sys.path:
-    sys.path.insert(0, BASE_DIR)
+if REPO_DIR not in sys.path:
+    sys.path.insert(0, REPO_DIR)
 
-from analyzer import EgxAnalyzer
-from vizulliztion import EgxVisualization
-from scraper import EgxScraper
+from app.analyzer import EgxAnalyzer
+from app.vizulliztion import EgxVisualization
+from app.scraper import EgxScraper
 
 st.set_page_config(
     page_title="EGX Market Intelligence",
@@ -25,11 +25,11 @@ page = st.sidebar.radio(
     [
         "Overview",
         "Scraping",
+        "Sector Analysis",
         "Company Analysis",
         "Stock Screener",
-        "Network Analysis",
         "Gainers & Losers",
-        "Sector Analysis",
+        "Network Analysis",
         "3D Analysis",
         "Summary",
     ],
@@ -37,7 +37,7 @@ page = st.sidebar.radio(
 
 
 @st.cache_resource
-def loader(raw_mtime, stock_mtime):
+def loader(raw_mtime, stock_mtime, scraper_mtime):
     analyzer = EgxAnalyzer(DATA_DIR)
 
     if not analyzer.load_data():
@@ -53,11 +53,13 @@ def loader(raw_mtime, stock_mtime):
 
 raw_path = os.path.join(DATA_DIR, "raw.csv")
 stock_path = os.path.join(DATA_DIR, "stock_data.csv")
+scraper_path = os.path.join(APP_DIR, "ingestion", "scraper.py")
 
 raw_mtime = os.path.getmtime(raw_path) if os.path.exists(raw_path) else None
 stock_mtime = os.path.getmtime(stock_path) if os.path.exists(stock_path) else None
+scraper_mtime = os.path.getmtime(scraper_path) if os.path.exists(scraper_path) else None
 
-analyzer, viz, scraper = loader(raw_mtime, stock_mtime)
+analyzer, viz, scraper = loader(raw_mtime, stock_mtime, scraper_mtime)
 
 if analyzer is None:
     st.error("Missing dataset files (raw.csv / stock_data.csv)")
@@ -160,15 +162,15 @@ elif page == "Company Analysis":
     left, right = st.columns(2)
     with left:
         st.subheader("Price Trend")
-        st.pyplot(viz.plot_company_price(company), use_container_width=True)
+        st.plotly_chart(viz.plot_company_price(company), use_container_width=True)
 
     with right:
         st.subheader("Monthly Returns")
-        st.pyplot(viz.plot_company_monthly_returns(company), use_container_width=True)
+        st.plotly_chart(viz.plot_company_monthly_returns(company), use_container_width=True)
 
     st.divider()
     st.subheader("Risk Analysis")
-    st.pyplot(viz.plot_rolling_volatility(company), use_container_width=True)
+    st.plotly_chart(viz.plot_rolling_volatility(company), use_container_width=True)
     st.divider()
 
 elif page == "Stock Screener":
@@ -220,14 +222,14 @@ elif page == "Network Analysis":
     st.caption("Sector relationships and market risk structure")
     st.divider()
     st.subheader("Sector Network Graph")
-    st.pyplot(viz.networkx_sector(), use_container_width=True)
+    st.plotly_chart(viz.networkx_sector(), use_container_width=True)
     st.divider()
     st.subheader("Market Volatility Distribution")
-    st.pyplot(viz.PlotVolatility(), use_container_width=True)
+    st.plotly_chart(viz.PlotVolatility(), use_container_width=True)
 
 elif page == "Sector Analysis":
     st.title("Sector Performance")
-    st.pyplot(viz.PlotSector_Growth(), use_container_width=True)
+    st.plotly_chart(viz.PlotSector_Growth(), use_container_width=True)
 
 elif page == "Gainers & Losers":
     st.title("Market Leaders")
@@ -235,11 +237,11 @@ elif page == "Gainers & Losers":
     c1, c2 = st.columns(2)
     with c1:
         st.subheader("Top Gainers")
-        st.pyplot(viz.plot_gainers(5), use_container_width=True)
+        st.plotly_chart(viz.plot_gainers(5), use_container_width=True)
 
     with c2:
         st.subheader("Top Losers")
-        st.pyplot(viz.plot_losers(5), use_container_width=True)
+        st.plotly_chart(viz.plot_losers(5), use_container_width=True)
 
     st.divider()
     st.subheader("Monthly Heatmap")
@@ -247,7 +249,7 @@ elif page == "Gainers & Losers":
     monthly_perf = analyzer.get_monthly()
     top_companies = analyzer.top_activity_companies(15)
 
-    st.pyplot(viz.heatmap(top_companies, monthly_perf), use_container_width=True)
+    st.plotly_chart(viz.heatmap(top_companies, monthly_perf), use_container_width=True)
 
 elif page == "3D Analysis":
     st.title("3D Market Analysis")

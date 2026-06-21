@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 
-from core.constants import SHORT_WINDOW
+from app.constants import SHORT_WINDOW
 
 
 def sector_recent_return(df, sector_name, periods=SHORT_WINDOW):

@@ -1,8 +1,10 @@
 import numpy as np
 import pandas as pd
 
-from core.constants import FALLBACK_METADATA, NAME_MAP, SECTORS
+from app.constants import FALLBACK_METADATA, NAME_MAP, SECTORS, CompaniesNamesStock, CompanySectorsStock
 from core.helpers import safe_map
+
+COMPANY_TO_SYMBOL = {company: symbol for symbol, company in CompaniesNamesStock.items()}
 
 
 def normalize_company_names(df, column="Company"):
@@ -64,6 +66,17 @@ def _clean_sector_frame(df):
     if "Sector" not in cleaned.columns:
         cleaned["Sector"] = np.nan
 
+    missing_sector = cleaned["Sector"].isna() | (cleaned["Sector"].astype(str).str.strip() == "")
+    if missing_sector.any():
+        if "Symbol" in cleaned.columns:
+            cleaned.loc[missing_sector, "Sector"] = cleaned.loc[missing_sector, "Symbol"].map(CompanySectorsStock)
+
+        still_missing = cleaned["Sector"].isna() | (cleaned["Sector"].astype(str).str.strip() == "")
+        if still_missing.any():
+            cleaned.loc[still_missing, "Sector"] = cleaned.loc[still_missing, "Company"].map(
+                lambda company: CompanySectorsStock.get(COMPANY_TO_SYMBOL.get(company))
+            )
+
     cleaned = cleaned[cleaned["Sector"].isin(SECTORS)].copy()
     required_cols = [col for col in ["Company", "Sector"] if col in cleaned.columns]
     if not required_cols:
@@ -104,6 +117,20 @@ def build_company_info_map(stock_df):
         .set_index("Company")[["Sector", "Price", "YTD", "M.Cap"]]
         .to_dict("index")
     )
+
+    if "Symbol" in prepared.columns:
+        for _, row in prepared.drop_duplicates("Company").iterrows():
+            company = row.get("Company")
+            symbol = row.get("Symbol")
+            if not company or company not in company_info_map:
+                continue
+
+            if pd.isna(company_info_map[company].get("Sector")) or not company_info_map[company].get("Sector"):
+                sector = CompanySectorsStock.get(symbol)
+                if not sector:
+                    sector = CompanySectorsStock.get(COMPANY_TO_SYMBOL.get(company))
+                if sector:
+                    company_info_map[company]["Sector"] = sector
 
     for company, info in FALLBACK_METADATA.items():
         company_info_map.setdefault(company, info.copy())

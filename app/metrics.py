@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 
-from core.constants import TRADING_DAYS
+from app.constants import TRADING_DAYS
 from core.helpers import safe_annualized_volatility, safe_max_drawdown, safe_pct_return
 
 

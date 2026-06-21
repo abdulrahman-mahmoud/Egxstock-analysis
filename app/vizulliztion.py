@@ -1,11 +1,10 @@
-import matplotlib.pyplot as plt
 import networkx as nx
-import seaborn as sns
 import pandas as pd
+import plotly.graph_objects as go
 import plotly.express as px
 
-from core.metrics import company_monthly_returns, monthly_performance, rolling_volatility, top_n_per_month, three_d_monthly_data
-from core.sector import sector_growth_data
+from app.metrics import company_monthly_returns, monthly_performance, rolling_volatility, top_n_per_month, three_d_monthly_data
+from app.sector import sector_growth_data
 
 
 class EgxVisualization:
@@ -21,15 +20,34 @@ class EgxVisualization:
         "Utilities": "#00bcd4",
         "Telecom": "#3122ff",
         "Oil & Gas": "#080808",
+        "Real Estate": "#8e44ad",
+        "Banking": "#2980b9",
+        "FinTech": "#16a085",
+        "Automotive": "#d35400",
+        "ETF": "#7f8c8d",
     }
 
     def __init__(self, data):
         self.data = data
 
     def _empty_fig(self, title):
-        fig, ax = plt.subplots(figsize=(8, 4))
-        ax.set_title(title)
-        ax.axis("off")
+        fig = go.Figure()
+        fig.add_annotation(
+            text="No data available",
+            x=0.5,
+            y=0.5,
+            xref="paper",
+            yref="paper",
+            showarrow=False,
+            font=dict(size=16),
+        )
+        fig.update_layout(
+            title=title,
+            template="plotly_white",
+            xaxis=dict(visible=False),
+            yaxis=dict(visible=False),
+            height=400,
+        )
         return fig
 
     def plot_company_price(self, company_name):
@@ -37,13 +55,19 @@ class EgxVisualization:
         if company_df.empty:
             return self._empty_fig(f"Price Trend - {company_name}")
 
-        fig, ax = plt.subplots(figsize=(14, 5))
-        ax.plot(pd.to_datetime(company_df["Date"]), company_df["Close"], linewidth=2)
-        ax.set_title(f"Price Trend - {company_name}", fontsize=13)
-        ax.set_xlabel("Date")
-        ax.set_ylabel("Close")
-        ax.grid(True, alpha=0.3)
-        plt.tight_layout()
+        fig = px.line(
+            company_df,
+            x=pd.to_datetime(company_df["Date"]),
+            y="Close",
+            title=f"Price Trend - {company_name}",
+            template="plotly_white",
+        )
+        fig.update_traces(line=dict(width=3))
+        fig.update_layout(
+            xaxis_title="Date",
+            yaxis_title="Close",
+            height=450,
+        )
         return fig
 
     def plot_company_monthly_returns(self, company_name):
@@ -51,13 +75,19 @@ class EgxVisualization:
         if monthly.empty:
             return self._empty_fig(f"Monthly Returns - {company_name}")
 
-        fig, ax = plt.subplots(figsize=(14, 5))
-        ax.bar(monthly["Month"], monthly["Monthly_Return"])
-        ax.set_title("Monthly Returns", fontsize=13)
-        ax.set_xlabel("Month")
-        ax.set_ylabel("Return %")
-        ax.tick_params(axis="x", rotation=45)
-        plt.tight_layout()
+        fig = px.bar(
+            monthly,
+            x="Month",
+            y="Monthly_Return",
+            title=f"Monthly Returns - {company_name}",
+            template="plotly_white",
+        )
+        fig.update_traces(marker_color="#3498db")
+        fig.update_layout(
+            xaxis_title="Month",
+            yaxis_title="Return %",
+            height=450,
+        )
         return fig
 
     def networkx_sector(self):
@@ -72,44 +102,104 @@ class EgxVisualization:
                 for j in range(i + 1, len(companies)):
                     graph.add_edge(companies[i], companies[j])
 
-        node_colors = [
-            self.sector_colors.get(graph.nodes[n].get("sector", ""), "#95a5a6")
-            for n in graph.nodes()
-        ]
+        if graph.number_of_nodes() == 0:
+            return self._empty_fig("EGX Companies Network - Grouped by Sector")
 
-        fig, ax = plt.subplots(figsize=(14, 10))
-        pos = nx.spring_layout(graph, k=2, iterations=50, seed=42)
+        pos = nx.spring_layout(
+            graph,
+            k=1 / max(len(graph.nodes()) ** 0.5, 1),
+            iterations=100,
+            seed=42,
+        )
 
-        nx.draw_networkx_nodes(graph, pos, ax=ax, node_color=node_colors, node_size=800, alpha=0.9)
-        nx.draw_networkx_edges(graph, pos, ax=ax, edge_color="#000000", width=0.5, alpha=0.3)
-        nx.draw_networkx_labels(graph, pos, ax=ax, font_size=7, font_weight="bold")
+        edge_x = []
+        edge_y = []
+        for source, target in graph.edges():
+            x0, y0 = pos[source]
+            x1, y1 = pos[target]
+            edge_x.extend([x0, x1, None])
+            edge_y.extend([y0, y1, None])
 
-        legend_list = [
-            plt.Line2D([0], [0], marker="o", color="w", markerfacecolor=c, markersize=10, label=s)
-            for s, c in self.sector_colors.items()
-            if s in self.data.df["Sector"].dropna().unique()
-        ]
+        edge_trace = go.Scatter(
+            x=edge_x,
+            y=edge_y,
+            line=dict(width=0.5, color="rgba(0,0,0,0.25)"),
+            hoverinfo="none",
+            mode="lines",
+        )
 
-        ax.legend(handles=legend_list, loc="upper left", fontsize=9)
-        ax.set_title("EGX Companies Network — Grouped by Sector", fontsize=14)
-        ax.axis("off")
-        plt.tight_layout()
+        traces = [edge_trace]
+        seen_sectors = []
+        for node, attrs in graph.nodes(data=True):
+            sector = attrs.get("sector", "")
+            if sector not in seen_sectors:
+                seen_sectors.append(sector)
+
+        for sector in seen_sectors:
+            sector_nodes = [node for node, attrs in graph.nodes(data=True) if attrs.get("sector", "") == sector]
+            traces.append(
+                go.Scatter(
+                    x=[pos[node][0] for node in sector_nodes],
+                    y=[pos[node][1] for node in sector_nodes],
+                    mode="markers+text",
+                    text=sector_nodes,
+                    textposition="top center",
+                    textfont=dict(size=10),
+                    name=sector or "Unknown",
+                    hovertext=[f"{node}<br>Sector: {sector or 'Unknown'}" for node in sector_nodes],
+                    hoverinfo="text",
+                    marker=dict(
+                        size=18,
+                        color=self.sector_colors.get(sector, "#95a5a6"),
+                        line=dict(width=1, color="#ffffff"),
+                        opacity=0.95,
+                    ),
+                )
+            )
+
+        fig = go.Figure(data=traces)
+        fig.update_layout(
+            title="EGX Companies Network - Grouped by Sector",
+            template="plotly_white",
+            showlegend=True,
+            legend_title_text="Sector",
+            hovermode="closest",
+            height=800,
+            margin=dict(l=20, r=20, t=60, b=20),
+        )
+        fig.update_xaxes(visible=False, showgrid=False, zeroline=False)
+        fig.update_yaxes(visible=False, showgrid=False, zeroline=False)
         return fig
 
     def PlotSector_Growth(self):
         sector_data = sector_growth_data(self.data.df)
-        fig, ax = plt.subplots(figsize=(14, 6))
-
+        frames = []
         for sector, records in sector_data.items():
             df_sector = pd.DataFrame(records)
-            ax.plot(pd.to_datetime(df_sector["Date"]), df_sector["Portfolio_Value"], label=sector, linewidth=2)
+            if not df_sector.empty:
+                df_sector = df_sector.copy()
+                df_sector["Date"] = pd.to_datetime(df_sector["Date"])
+                df_sector["Sector"] = sector
+                frames.append(df_sector)
 
-        ax.set_title("Growth of 10,000 EGP Investment by Sector", fontsize=14)
-        ax.set_xlabel("Date")
-        ax.set_ylabel("Portfolio Value (EGP)")
-        ax.legend(loc="upper left", bbox_to_anchor=(1, 1))
-        ax.grid(True, alpha=0.3)
-        plt.tight_layout()
+        if not frames:
+            return self._empty_fig("Growth of 10,000 EGP Investment by Sector")
+
+        plot_df = pd.concat(frames, ignore_index=True)
+        fig = px.line(
+            plot_df,
+            x="Date",
+            y="Portfolio_Value",
+            color="Sector",
+            title="Growth of 10,000 EGP Investment by Sector",
+            template="plotly_white",
+        )
+        fig.update_layout(
+            xaxis_title="Date",
+            yaxis_title="Portfolio Value (EGP)",
+            height=500,
+            legend_title_text="Sector",
+        )
         return fig
 
     def PlotVolatility(self):
@@ -119,14 +209,20 @@ class EgxVisualization:
         if df_vol.empty:
             return self._empty_fig("Annualised Volatility per Company")
 
-        fig, ax = plt.subplots(figsize=(13, 6))
-        ax.bar(range(len(df_vol)), df_vol["Ann_Volatility"])
-        ax.set_xticks(range(len(df_vol)))
-        ax.set_xticklabels(df_vol["Company"], rotation=45, ha="right", fontsize=7)
-        ax.set_title("Annualised Volatility per Company", fontsize=14)
-        ax.set_xlabel("Company")
-        ax.set_ylabel("Annualised Volatility (%)")
-        plt.tight_layout()
+        fig = px.bar(
+            df_vol,
+            x="Company",
+            y="Ann_Volatility",
+            title="Annualised Volatility per Company",
+            template="plotly_white",
+        )
+        fig.update_traces(marker_color="#8e44ad")
+        fig.update_layout(
+            xaxis_title="Company",
+            yaxis_title="Annualised Volatility (%)",
+            height=500,
+            xaxis_tickangle=-45,
+        )
         return fig
 
     def plot_rolling_volatility(self, company_name):
@@ -134,13 +230,19 @@ class EgxVisualization:
         if data.empty:
             return self._empty_fig(f"30-Day Rolling Annualised Volatility — {company_name}")
 
-        fig, ax = plt.subplots(figsize=(14, 5))
-        ax.plot(pd.to_datetime(data["date"]), data["volatility"], linewidth=2)
-        ax.set_title(f"30-Day Rolling Annualised Volatility — {company_name}", fontsize=13)
-        ax.set_xlabel("Date")
-        ax.set_ylabel("Volatility (%)")
-        ax.grid(True, alpha=0.3)
-        plt.tight_layout()
+        fig = px.line(
+            data,
+            x=pd.to_datetime(data["date"]),
+            y="volatility",
+            title=f"30-Day Rolling Annualised Volatility - {company_name}",
+            template="plotly_white",
+        )
+        fig.update_traces(line=dict(width=3, color="#16a085"))
+        fig.update_layout(
+            xaxis_title="Date",
+            yaxis_title="Volatility (%)",
+            height=450,
+        )
         return fig
 
     def heatmap(self, companies, monthly_perf):
@@ -158,22 +260,24 @@ class EgxVisualization:
             values="Monthly_Return",
         )
 
-        fig, ax = plt.subplots(figsize=(14, 10))
-        sns.heatmap(
-            plot_df.astype(float),
-            annot=True,
-            fmt=".2f",
-            cmap="RdYlGn",
-            center=0,
-            linewidths=.5,
-            cbar_kws={"label": "Monthly Return %"},
-            ax=ax,
+        fig = go.Figure(
+            data=go.Heatmap(
+                z=plot_df.astype(float).values,
+                x=plot_df.columns.tolist(),
+                y=plot_df.index.tolist(),
+                colorscale="RdYlGn",
+                zmid=0,
+                colorbar=dict(title="Monthly Return %"),
+                hovertemplate="Company=%{y}<br>Month=%{x}<br>Return=%{z:.2f}%<extra></extra>",
+            )
         )
-
-        ax.set_title("EGX Monthly Performance: Top Companies", fontsize=16)
-        ax.set_ylabel("Company")
-        ax.set_xlabel("Month")
-        plt.tight_layout()
+        fig.update_layout(
+            title="EGX Monthly Performance: Top Companies",
+            template="plotly_white",
+            xaxis_title="Month",
+            yaxis_title="Company",
+            height=700,
+        )
         return fig
 
     def plot_gainers(self, n=5):
@@ -186,12 +290,20 @@ class EgxVisualization:
         latest = x[x["Month"] == x["Month"].max()]
         data = latest[latest["Type"] == "Gainer"].sort_values("Monthly_Return", ascending=False)
 
-        fig, ax = plt.subplots(figsize=(7, 5))
-        ax.barh(data["Company"], data["Monthly_Return"], color="#2ecc71")
-        ax.set_title(f"Top {n} Gainers")
-        ax.axvline(0, color="black", linewidth=0.8)
-        ax.invert_yaxis()
-        plt.tight_layout()
+        fig = px.bar(
+            data.sort_values("Monthly_Return", ascending=True),
+            x="Monthly_Return",
+            y="Company",
+            orientation="h",
+            title=f"Top {n} Gainers",
+            template="plotly_white",
+        )
+        fig.update_traces(marker_color="#2ecc71")
+        fig.update_layout(
+            xaxis_title="Monthly Return %",
+            yaxis_title="Company",
+            height=450,
+        )
         return fig
 
     def plot_losers(self, n=5):
@@ -204,12 +316,20 @@ class EgxVisualization:
         latest = x[x["Month"] == x["Month"].max()]
         data = latest[latest["Type"] == "Loser"].sort_values("Monthly_Return", ascending=True)
 
-        fig, ax = plt.subplots(figsize=(7, 5))
-        ax.barh(data["Company"], data["Monthly_Return"], color="#e74c3c")
-        ax.set_title(f"Top {n} Losers")
-        ax.axvline(0, color="black", linewidth=0.8)
-        ax.invert_yaxis()
-        plt.tight_layout()
+        fig = px.bar(
+            data,
+            x="Monthly_Return",
+            y="Company",
+            orientation="h",
+            title=f"Top {n} Losers",
+            template="plotly_white",
+        )
+        fig.update_traces(marker_color="#e74c3c")
+        fig.update_layout(
+            xaxis_title="Monthly Return %",
+            yaxis_title="Company",
+            height=450,
+        )
         return fig
 
     def ThreeD_plt(self):

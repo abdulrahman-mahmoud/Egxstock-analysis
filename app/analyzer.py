@@ -4,7 +4,7 @@ import pandas as pd
 import skfuzzy as fuzz
 from skfuzzy import control as ctrl
 
-from core.metrics import (
+from app.metrics import (
     annualized_volatility,
     enrich_market_data,
     max_drawdown,
@@ -13,10 +13,10 @@ from core.metrics import (
     rolling_volatility,
     three_d_monthly_data,
 )
-from core.sector import sector_growth_data, sector_recent_return
+from app.sector import sector_growth_data, sector_recent_return
 from core.loader import load_data_files
-from core.cleaner import clean_datasets
-from core.constants import LONG_WINDOW, SHORT_WINDOW, TRADING_DAYS, VOL_WINDOW
+from app.cleaner import clean_datasets
+from app.constants import LONG_WINDOW, SHORT_WINDOW, TRADING_DAYS, VOL_WINDOW
 
 
 class EgxAnalyzer:
