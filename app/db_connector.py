@@ -1,1 +1,0 @@
-# Placeholder for future database connection and query logic.
