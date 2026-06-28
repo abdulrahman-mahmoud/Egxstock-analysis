@@ -1,1 +1,0 @@
--- Placeholder for future SQL schema definitions.
