@@ -1,4 +1,5 @@
 import os
+import re
 import numpy as np
 import pandas as pd
 import skfuzzy as fuzz
@@ -16,7 +17,7 @@ from app.metrics import (
 from app.sector import sector_growth_data, sector_recent_return
 from core.loader import load_data_files
 from app.cleaner import clean_datasets
-from app.constants import LONG_WINDOW, CompanySectorsStock, MANUAL_SECTOR_MAP, SHORT_WINDOW, TRADING_DAYS, VOL_WINDOW
+from app.constants import LONG_WINDOW, MANUAL_SECTOR_MAP, SHORT_WINDOW, TRADING_DAYS, VOL_WINDOW
 
 
 class EgxAnalyzer:
@@ -26,7 +27,6 @@ class EgxAnalyzer:
         self.df2 = None
         self.sector_map = None
         self.company_info_map = None
-        self.CompanySectorsStock = CompanySectorsStock
         self.MANUAL_SECTOR_MAP = MANUAL_SECTOR_MAP
         self.error_message = None
         self.data = data
@@ -124,9 +124,7 @@ class EgxAnalyzer:
 
         return float(volume_series.iloc[-1])
 
-    # REMINDER: SQL REPLACEMENT POINT
     def load_data(self):
-        # REMINDER: SQL REPLACEMENT POINT
         try:
             self.df, self.df2 = load_data_files(self.data)
             return True
@@ -134,26 +132,134 @@ class EgxAnalyzer:
             self.error_message = f"Error loading data: {e}"
             return False
 
+    def _normalize_company_name(self, company_name):
+        if not company_name:
+            return ""
+        text = str(company_name).lower()
+        text = re.sub(r"[^a-z0-9]+", " ", text)
+        text = re.sub(r"\bfor\b", " ", text)
+        text = re.sub(r"\s+", " ", text).strip()
+        return text
+
+    def _map_company_to_symbol(self, company_name):
+        if self.df is None or self.df.empty or "Company" not in self.df.columns or "Symbol" not in self.df.columns:
+            return None
+
+        target_name = self._normalize_company_name(company_name)
+        if not target_name:
+            return None
+
+        company_rows = self.df.drop_duplicates("Company")
+        exact = company_rows[company_rows["Company"].astype(str).str.strip() == str(company_name).strip()]
+        if not exact.empty:
+            symbol = exact.iloc[0].get("Symbol")
+            if symbol:
+                return symbol
+
+        for _, row in company_rows.iterrows():
+            candidate_name = self._normalize_company_name(row.get("Company"))
+            if candidate_name and candidate_name == target_name:
+                symbol = row.get("Symbol")
+                if symbol:
+                    return symbol
+
+        for _, row in company_rows.iterrows():
+            candidate_name = self._normalize_company_name(row.get("Company"))
+            if candidate_name and target_name in candidate_name.split() and len(target_name.split()) >= 2:
+                symbol = row.get("Symbol")
+                if symbol:
+                    return symbol
+
+        return None
+
+    def _apply_manual_sector_fallback(self):
+        if self.df is None or self.df.empty or "Sector" not in self.df.columns:
+            return
+
+        if "Symbol" in self.df.columns and self.MANUAL_SECTOR_MAP:
+            # clean symbol and current sector values to avoid mismatch due to whitespace
+            symbol_clean = self.df["Symbol"].astype(str).str.strip()
+            current_sector = self.df["Sector"].astype(str).str.strip()
+            is_unknown = current_sector.str.lower().isin(["", "unknown", "nan", "none"])
+
+            manual_sector = symbol_clean.map(self.MANUAL_SECTOR_MAP)
+            # only overwrite unknown sectors
+            self.df.loc[is_unknown, "Sector"] = manual_sector[is_unknown]
+            self.df["Sector"] = self.df["Sector"].fillna("Unknown")
+
+            # end of manual sector application
+
+        if self.company_info_map is not None:
+            for company_name, info in self.company_info_map.items():
+                if not isinstance(info, dict):
+                    continue
+
+                sector_value = info.get("Sector")
+                if pd.isna(sector_value) or not str(sector_value).strip() or str(sector_value).strip().lower() == "unknown":
+                    symbol = self._map_company_to_symbol(company_name)
+                    fallback_sector = self.MANUAL_SECTOR_MAP.get(symbol) if symbol else None
+                    if fallback_sector:
+                        info["Sector"] = fallback_sector
+
     def clean(self):
         try:
             self.df, self.df2, self.company_info_map, self.sector_map = clean_datasets(self.df, self.df2)
-            if self.df is not None and not self.df.empty and "Sector" in self.df.columns:
-                if "Symbol" in self.df.columns and self.MANUAL_SECTOR_MAP:
-                    current_sector = self.df["Sector"].replace({"Unknown": np.nan, "unknown": np.nan})
-                    manual_sector = self.df["Symbol"].map(self.MANUAL_SECTOR_MAP)
-                    self.df["Sector"] = current_sector.combine_first(manual_sector).fillna("Unknown")
-                else:
-                    self.df["Sector"] = self.df["Sector"].fillna("Unknown")
+            self._apply_manual_sector_fallback()
             return True
         except Exception as e:
             self.error_message = f"Error loading data: {e}"
             return False
 
+    def _resolve_company_sector(self, company_name, info=None):
+        if not company_name:
+            return None
+
+        if isinstance(info, dict):
+            sector_value = info.get("Sector")
+            if sector_value not in [None, "", "Unknown", "unknown"]:
+                return sector_value
+
+        if self.df is not None and not self.df.empty and "Company" in self.df.columns and "Sector" in self.df.columns:
+            company_rows = self.df[self.df["Company"].astype(str).str.strip() == str(company_name).strip()]
+            if not company_rows.empty:
+                sector_value = company_rows.iloc[0].get("Sector")
+                if sector_value not in [None, "", "Unknown", "unknown"]:
+                    return sector_value
+
+        if self.df is not None and not self.df.empty and "Company" in self.df.columns and "Symbol" in self.df.columns:
+            company_rows = self.df[self.df["Company"].astype(str).str.strip() == str(company_name).strip()]
+            if not company_rows.empty:
+                symbol = company_rows.iloc[0].get("Symbol")
+                if symbol:
+                    fallback_sector = self.MANUAL_SECTOR_MAP.get(symbol)
+                    if fallback_sector:
+                        return fallback_sector
+
+        symbol = self._map_company_to_symbol(company_name)
+        if symbol:
+            fallback_sector = self.MANUAL_SECTOR_MAP.get(symbol)
+            if fallback_sector:
+                return fallback_sector
+
+        return None
+
     def company_info(self, company_name):
         if self.company_info_map is None:
             return {}
 
-        return self.company_info_map.get(company_name, {})
+        direct_info = self.company_info_map.get(company_name)
+        if isinstance(direct_info, dict):
+            resolved_sector = self._resolve_company_sector(company_name, direct_info)
+            if resolved_sector:
+                direct_info = dict(direct_info)
+                direct_info["Sector"] = resolved_sector
+            return direct_info
+
+        resolved_sector = self._resolve_company_sector(company_name)
+        if resolved_sector:
+            return {"Sector": resolved_sector}
+
+        return {}
 
     def checker(self):
         if self.df is None or self.df.empty:
@@ -180,34 +286,44 @@ class EgxAnalyzer:
             return None
 
         latest = company_data.iloc[-1]
-        annl_vol = annualized_volatility(company_data["Daily_Return"])
+        daily_return_col = "Daily_Return" if "Daily_Return" in company_data.columns else None
+        market_cap_col = "MarketCap" if "MarketCap" in company_data.columns else None
+        total_gain_col = "Total_Gain" if "Total_Gain" in company_data.columns else None
+        portfolio_value_col = "Portfolio_Value" if "Portfolio_Value" in company_data.columns else None
+        price_range_col = "Price_Range" if "Price_Range" in company_data.columns else None
 
-        company_summary = company_data[
-            ["Open", "High", "Low", "Close", "Volume", "Daily_Return"]
-        ].dropna().describe().to_dict()
+        if daily_return_col and company_data[daily_return_col].notna().any():
+            annl_vol = annualized_volatility(company_data[daily_return_col])
+        else:
+            annl_vol = np.nan
+
+        summary_columns = [col for col in ["Open", "High", "Low", "Close", "Volume", "Daily_Return"] if col in company_data.columns]
+        company_summary = company_data[summary_columns].dropna().describe().to_dict() if summary_columns else {}
+
+        sector_value = self._resolve_company_sector(company_name, company_row)
 
         return {
             "company name": company_name,
-            "sector": company_row.get("Sector", "Unknown"),
-            "ytd": company_row.get("YTD", np.nan),
-            "fundamental_price": company_row.get("Price", np.nan),
-            "market_cap_fundamental": company_row.get("M.Cap", np.nan),
+            "sector": sector_value if sector_value not in [None, "", "Unknown", "unknown"] else "Unknown",
+            "ytd": company_row.get("YTD", np.nan) if isinstance(company_row, dict) else np.nan,
+            "fundamental_price": company_row.get("Price", np.nan) if isinstance(company_row, dict) else np.nan,
+            "market_cap_fundamental": company_row.get("M.Cap", np.nan) if isinstance(company_row, dict) else np.nan,
             "date_min": company_data["Date"].min(),
             "date_max": company_data["Date"].max(),
             "latest": {
                 "date": latest["Date"],
                 "close": float(latest["Close"]),
                 "volume": self.latest_valid_volume(company_data),
-                "market_cap": float(latest["MarketCap"]),
+                "market_cap": float(latest[market_cap_col]) if market_cap_col and market_cap_col in latest.index and not pd.isna(latest[market_cap_col]) else np.nan,
             },
             "performance": {
-                "daily_return_avg": float(company_data["Daily_Return"].mean() * 100),
-                "total_gain": float(latest["Total_Gain"]),
-                "portfolio_value": float(latest["Portfolio_Value"]),
+                "daily_return_avg": float(company_data[daily_return_col].mean() * 100) if daily_return_col and daily_return_col in company_data.columns else np.nan,
+                "total_gain": float(latest[total_gain_col]) if total_gain_col and total_gain_col in latest.index and not pd.isna(latest[total_gain_col]) else np.nan,
+                "portfolio_value": float(latest[portfolio_value_col]) if portfolio_value_col and portfolio_value_col in latest.index and not pd.isna(latest[portfolio_value_col]) else np.nan,
             },
             "risk": {
-                "annualized_volatility": float(annl_vol),
-                "price_range_avg": float(company_data["Price_Range"].mean() * 100),
+                "annualized_volatility": float(annl_vol) if not pd.isna(annl_vol) else np.nan,
+                "price_range_avg": float(company_data[price_range_col].mean() * 100) if price_range_col and price_range_col in company_data.columns else np.nan,
             },
             "summary_stats": company_summary,
         }

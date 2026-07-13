@@ -59,7 +59,12 @@ raw_mtime = os.path.getmtime(raw_path) if os.path.exists(raw_path) else None
 stock_mtime = os.path.getmtime(stock_path) if os.path.exists(stock_path) else None
 scraper_mtime = os.path.getmtime(scraper_path) if os.path.exists(scraper_path) else None
 
-analyzer, viz, scraper = loader(raw_mtime, stock_mtime, scraper_mtime)
+# Rebuild the analyzer state on each run so the UI reflects the latest sector fallback logic.
+analyzer, viz, scraper = (
+    loader(raw_mtime, stock_mtime, scraper_mtime)
+    if os.path.exists(raw_path) and os.path.exists(stock_path)
+    else (None, None, None)
+)
 
 if analyzer is None:
     st.error("Missing dataset files (raw.csv / stock_data.csv)")
@@ -126,6 +131,13 @@ elif page == "Company Analysis":
 
     data = analyzer.specific_company(company)
     decision = analyzer.company_decision(company)
+
+    if data is not None and isinstance(data, dict):
+        sector_value = data.get("sector")
+        if sector_value in [None, "", "Unknown", "unknown"]:
+            fallback_sector = analyzer.company_info(company).get("Sector")
+            if fallback_sector not in [None, "", "Unknown", "unknown"]:
+                data["sector"] = fallback_sector
 
     if data is None:
         st.error("No data available for this company")
