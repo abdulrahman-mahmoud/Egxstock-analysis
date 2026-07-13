@@ -7,7 +7,7 @@ CompaniesNamesStock = {
         "ACGC.CA": "Arab Cotton Ginning",
         "APSW.CA": "Unirab Polvara Spinning",
         "ARVA.CA": "Arab Valves Company",
-        "ASCM.CA": "ASCOM Mining",
+        "ASCM.CA": "ASCOM Minging",
         "BIDI.CA": "BID - El Badr for Investment & Development",
         "PRCL.CA": "General Ceramics & Porcelain",
         "DTPP.CA": "Delta Printing & Packaging",
@@ -227,6 +227,8 @@ CompanySectorsStock = {
         # ETF
         "EGX30ETF.CA": "ETF",
 }
+
+MANUAL_SECTOR_MAP = dict(CompanySectorsStock)
 
 SECTORS = [
     "Financials",

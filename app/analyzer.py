@@ -16,7 +16,7 @@ from app.metrics import (
 from app.sector import sector_growth_data, sector_recent_return
 from core.loader import load_data_files
 from app.cleaner import clean_datasets
-from app.constants import LONG_WINDOW, SHORT_WINDOW, TRADING_DAYS, VOL_WINDOW
+from app.constants import LONG_WINDOW, CompanySectorsStock, MANUAL_SECTOR_MAP, SHORT_WINDOW, TRADING_DAYS, VOL_WINDOW
 
 
 class EgxAnalyzer:
@@ -26,6 +26,8 @@ class EgxAnalyzer:
         self.df2 = None
         self.sector_map = None
         self.company_info_map = None
+        self.CompanySectorsStock = CompanySectorsStock
+        self.MANUAL_SECTOR_MAP = MANUAL_SECTOR_MAP
         self.error_message = None
         self.data = data
         self.decision_system = self.make_decision_system()
@@ -135,6 +137,13 @@ class EgxAnalyzer:
     def clean(self):
         try:
             self.df, self.df2, self.company_info_map, self.sector_map = clean_datasets(self.df, self.df2)
+            if self.df is not None and not self.df.empty and "Sector" in self.df.columns:
+                if "Symbol" in self.df.columns and self.MANUAL_SECTOR_MAP:
+                    current_sector = self.df["Sector"].replace({"Unknown": np.nan, "unknown": np.nan})
+                    manual_sector = self.df["Symbol"].map(self.MANUAL_SECTOR_MAP)
+                    self.df["Sector"] = current_sector.combine_first(manual_sector).fillna("Unknown")
+                else:
+                    self.df["Sector"] = self.df["Sector"].fillna("Unknown")
             return True
         except Exception as e:
             self.error_message = f"Error loading data: {e}"
